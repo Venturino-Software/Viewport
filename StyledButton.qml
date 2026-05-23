@@ -16,6 +16,7 @@ Button {
 
     // Animaciones
     property bool animated: true
+    property int minHeight: 44
 
     // Comportamiento
     flat: false
@@ -25,6 +26,7 @@ Button {
     contentItem: Row {
         spacing: 8
         anchors.centerIn: parent
+        height: control.minHeight * dpScale   // forzar altura
 
         Text {
             text: control.buttonIcon           // Usar buttonIcon

@@ -41,31 +41,16 @@ Popup {
         }
     }
 
-    // Animación de entrada
     enter: Transition {
         ParallelAnimation {
-            NumberAnimation {
-                property: "opacity"; from: 0; to: 1; duration: 200
-                easing.type: Easing.OutCubic
-            }
-            NumberAnimation {
-                property: "scale"; from: 0.9; to: 1; duration: 250
-                easing.type: Easing.OutBack
-            }
+            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 200; easing: Easing.OutCubic }
+            NumberAnimation { property: "scale"; from: 0.92; to: 1; duration: 250; easing: Easing.OutBack }
         }
     }
-
-    // Animación de salida
     exit: Transition {
         ParallelAnimation {
-            NumberAnimation {
-                property: "opacity"; from: 1; to: 0; duration: 150
-                easing.type: Easing.InCubic
-            }
-            NumberAnimation {
-                property: "scale"; from: 1; to: 0.95; duration: 150
-                easing.type: Easing.InCubic
-            }
+            NumberAnimation { property: "opacity"; to: 0; duration: 150; easing: Easing.InCubic }
+            NumberAnimation { property: "scale"; to: 0.96; duration: 150; easing: Easing.InCubic }
         }
     }
 

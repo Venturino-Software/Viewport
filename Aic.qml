@@ -2,9 +2,10 @@ import QtQuick
 
 Item {
     id: root
-    width: 32; height: 32
+    width: 32 * (typeof dpScale !== 'undefined' ? dpScale : 1)
+    height: 32 * (typeof dpScale !== 'undefined' ? dpScale : 1)
     z: 9999
-    enabled: false // Asegura que el cursor sea "fantasma"
+    enabled: true // Asegura que el cursor sea "fantasma"
 
     property string type: "arrow"
 
@@ -36,5 +37,12 @@ Item {
                 visible = true
             }
         }
+    }
+
+    function constrainPosition(newX, newY, parentWidth, parentHeight) {
+        var maxX = parentWidth - width
+        var maxY = parentHeight - height
+        return Qt.point(Math.max(0, Math.min(newX, maxX)),
+                        Math.max(0, Math.min(newY, maxY)))
     }
 }

@@ -21,16 +21,6 @@ property real dpScale: baseDpScale * zoomFactor // Ahora es dinámico, ¡escala 
 // Variable global para trackear la posición
 property point mousePos: Qt.point(0, 0)
 
-// Instancia de tu cursor personalizado
-Loader {
-    id: customCursorLoader
-    source: "Aic.qml"
-    visible: false
-}
-Aic {
-    id: customCursor
-    visible: false
-}
 Shortcut {
     sequence: "Ctrl++"
     onActivated: if (root.zoomFactor < 2.5) root.zoomFactor += 0.1
@@ -47,20 +37,7 @@ Shortcut {
 
 /* STREAMING_CHUNK:Defining AppIcon component... */
 
-HoverHandler {
-        id: hoverHandler
-        acceptedDevices: PointerDevice.AllDevices
-        onPointChanged: {
-            if (point !== null) {
-                customCursor.x = point.position.x - 2
-                customCursor.y = point.position.y - 2
-                customCursor.visible = true
-            }
-        }
-        onHoveredChanged: {
-            if (!hovered) customCursor.visible = false
-        }
-}
+
 // ============= COMPONENTE APPICON =============
 component AppIcon: Item {
     id: iconRoot
@@ -333,6 +310,7 @@ StyledPopup {
         // Botón estilizado
         StyledButton {
             text: "Cerrar"
+            Layout.minimumHeight: 44 * dpScale
             Layout.alignment: Qt.AlignRight
             onClicked: terminalPopup.close()
         }
@@ -368,6 +346,7 @@ StyledPopup {
 
         StyledButton {
             text: "⏻  Apagar"
+            Layout.minimumHeight: 44 * dpScale
             buttonColor: "#ff5252"
             Layout.fillWidth: true
             onClicked: {
@@ -377,6 +356,7 @@ StyledPopup {
         }
         StyledButton {
             text: "↻  Reiniciar"
+            Layout.minimumHeight: 44 * dpScale
             buttonColor: "#ffa726"
             Layout.fillWidth: true
             onClicked: {
@@ -386,6 +366,7 @@ StyledPopup {
         }
         StyledButton {
             text: "↩  Salir a TTY"
+            Layout.minimumHeight: 44 * dpScale
             Layout.fillWidth: true
             onClicked: {
                 AppBackend.openApp("loginctl terminate-session $XDG_SESSION_ID")
@@ -394,6 +375,7 @@ StyledPopup {
         }
         StyledButton {
             text: "Cancelar"
+            Layout.minimumHeight: 44 * dpScale
             buttonColor: "#666666"
             Layout.fillWidth: true
             onClicked: powerPopup.close()
@@ -464,6 +446,7 @@ StyledPopup {
 
         StyledButton {
             text: "Probar sonido"
+            Layout.minimumHeight: 44 * dpScale
             Layout.alignment: Qt.AlignHCenter
             onClicked: AppBackend.playTestSound()
         }
@@ -574,6 +557,7 @@ StyledPopup {
 
         StyledButton {
             text: "Configurar adaptador WiFi"
+            Layout.minimumHeight: 44 * dpScale
             Layout.fillWidth: true
             onClicked: AppBackend.openApp("kitty -e nmtui")
         }
@@ -654,6 +638,7 @@ StyledPopup {
             Layout.fillWidth: true
             StyledButton {
                 text: "Instalar"
+                Layout.minimumHeight: 44 * dpScale
                 buttonColor: "#ce93d8"
                 onClicked: {
                     if (passwordField.text === "") return
@@ -664,6 +649,7 @@ StyledPopup {
             }
             StyledButton {
                 text: "Cerrar"
+                Layout.minimumHeight: 44 * dpScale
                 onClicked: aptPopup.close()
             }
         }
@@ -1274,5 +1260,6 @@ function cancelLaunch() {
     launchAnim.stop()
     cancelAnim.start()
 }
+
 
 }
