@@ -13,8 +13,33 @@ visible: true
 title: qsTr("Viewport Launcher")
 color: "#05050a"  // BGCOLOR
 
-// Factor de escala basado en densidad de píxeles (referencia 96 dpi)
-readonly property real dpScale: Math.max(1.0, Screen.pixelDensity / 96.0)
+// --- SISTEMA DE ESCALADO DINÁMICO (ZOOM) ---
+property real zoomFactor: 1.0
+property real baseDpScale: Math.max(1.0, Screen.pixelDensity / 96.0)
+property real dpScale: baseDpScale * zoomFactor // Ahora es dinámico, ¡escala toda la UI junta!
+
+Shortcut {
+    sequence: "Ctrl++"
+    onActivated: if (root.zoomFactor < 2.5) root.zoomFactor += 0.1
+}
+Shortcut {
+    sequence: "Ctrl+-"
+    onActivated: if (root.zoomFactor > 0.5) root.zoomFactor -= 0.1
+}
+Shortcut {
+    sequence: "Ctrl+0" // Resetear zoom
+    onActivated: root.zoomFactor = 1.0
+}
+
+// --- FORZAR CURSOR (COMPATIBLE CON TÁCTIL) ---
+MouseArea {
+    id: globalCursorArea
+    anchors.fill: parent
+    z: 9999                      // Siempre arriba de todo
+    acceptedButtons: Qt.NoButton // CLAVE: No se roba los clics ni los toques táctiles
+    hoverEnabled: true           // Obliga a Wayland a dibujar la flecha del mouse
+    cursorShape: Qt.ArrowCursor
+}
 
 /* STREAMING_CHUNK:Defining AppIcon component... */
 // ============= COMPONENTE APPICON =============
@@ -111,13 +136,95 @@ Component.onCompleted: {
 // Función para actualizar el modelo filtrado según el texto
 function updateSearchFilter(text) {
     filteredSearchModel.clear()
+
+    if (text === "") {
+        for (var i = 0; i < baseSearchModel.count; i++) filteredSearchModel.append(baseSearchModel.get(i))
+        return
+    }
+
+    var prefix = text.charAt(0)
+    var query = text.substring(1).trim()
+    var lowerQuery = query.toLowerCase()
+
+    // 1. MODO CONSOLA ($)
+    if (prefix === '$') {
+        filteredSearchModel.append({
+            name: "Ejecutar en terminal",
+            category: query !== "" ? "> " + query : "Escribe un comando...",
+            icon: "kitty", // Usa el ícono de terminal que tengas
+            exec: "VPT_CMD|" + query
+        })
+        return
+    }
+
+    // 2. MODO INSTALADOR (@)
+    if (prefix === '@') {
+        filteredSearchModel.append({
+            name: "Instalar paquete (APT)",
+            category: query !== "" ? "apt install " + query : "Escribe el nombre de la app...",
+            icon: "system-software-install", // O deja uno vacío
+            exec: "VPT_APT|" + query
+        })
+        return
+    }
+
+    // 3. MODO SISTEMA (#)
+    if (prefix === '#') {
+        var sysCmds = [
+            {n: "Apagar", c: "Sistema", e: "VPT_SYS|poweroff"},
+            {n: "Reiniciar", c: "Sistema", e: "VPT_SYS|reboot"},
+            {n: "Subir Volumen", c: "Audio", e: "VPT_SYS|amixer sset Master 10%+"},
+            {n: "Bajar Volumen", c: "Audio", e: "VPT_SYS|amixer sset Master 10%-"},
+            {n: "Brillo Alto", c: "Pantalla", e: "VPT_SYS|brightnessctl set 100%"},
+            {n: "Brillo Bajo", c: "Pantalla", e: "VPT_SYS|brightnessctl set 10%"},
+            {n: "Configurar Red (WiFi)", c: "Redes", e: "VPT_SYS|kitty -e nmtui"}
+        ]
+
+        for (var j = 0; j < sysCmds.length; j++) {
+            if (query === "" || sysCmds[j].n.toLowerCase().includes(lowerQuery)) {
+                filteredSearchModel.append({
+                    name: sysCmds[j].n,
+                    category: sysCmds[j].c,
+                    icon: "", // Puedes asignar iconos si los tienes
+                    exec: sysCmds[j].e
+                })
+            }
+        }
+        return
+    }
+
+    // MODO NORMAL (Búsqueda de Apps)
     var lowerText = text.toLowerCase()
-    for (var i = 0; i < baseSearchModel.count; i++) {
-        var item = baseSearchModel.get(i)
+    for (var k = 0; k < baseSearchModel.count; k++) {
+        var item = baseSearchModel.get(k)
         if (item.name.toLowerCase().includes(lowerText) || item.category.toLowerCase().includes(lowerText)) {
             filteredSearchModel.append(item)
         }
     }
+}
+
+function executeSmartAction(execString, appName) {
+    console.log("[vpt] Procesando acción inteligente: " + execString)
+
+    if (execString.startsWith("VPT_CMD|")) {
+        var cmd = execString.substring(8)
+        if (cmd.length > 0) AppBackend.openApp("kitty -e " + cmd)
+    }
+    else if (execString.startsWith("VPT_APT|")) {
+        var pkg = execString.substring(8)
+        // Usa 'su -c' para pedir password de root en la terminal y luego instalar
+        if (pkg.length > 0) AppBackend.openApp("kitty -e su -c 'apt update && apt install -y " + pkg + "; echo Presiona Enter para salir; read'")
+    }
+    else if (execString.startsWith("VPT_SYS|")) {
+        var sysCmd = execString.substring(8)
+        AppBackend.openApp(sysCmd)
+    }
+    else {
+        // App normal
+        AppBackend.openApp(execString)
+    }
+
+    searchOverlay.state = "HIDDEN"
 }
 
 /* STREAMING_CHUNK:Building the main layout and Top Bar... */
@@ -182,9 +289,10 @@ Item {
                 id: searchClickArea
                 anchors.fill: parent
                 hoverEnabled: true
-                onClicked: {
+                // Al usar onPressed, el buscador salta apenas el dedo toca el vidrio
+                onPressed: {
                     if (searchOverlay.state !== "VISIBLE") {
-                        updateSearchFilter("")   // Mostrar todos inicialmente
+                        updateSearchFilter("")
                         searchOverlay.state = "VISIBLE"
                         searchInput.forceActiveFocus()
                     }
@@ -330,11 +438,7 @@ Item {
             enabled: searchOverlay.visible && searchList.currentIndex >= 0
             onActivated: {
                 var item = filteredSearchModel.get(searchList.currentIndex)
-                if (item) {
-                    console.log("[vpt] Lanzado desde búsqueda con Enter: " + item.name)
-                    AppBackend.openApp(item.exec) // <-- Ejecutando el comando real
-                    searchOverlay.state = "HIDDEN"
-                }
+                if (item) executeSmartAction(item.exec, item.name)
             }
         }
 
@@ -712,11 +816,7 @@ function launchApp(startX, startY, name, execCommand, index, iconName) {
 function cancelLaunch() {
     // Ignora si no está visible o si YA se está cancelando
     if (!transitionCard.visible || cancelAnim.running) return
-    function onAppClosed() {
-            console.log("El backend reporta que la app se cerró. Restaurando UI...")
-            // Llama aquí a tu función de restauración
-            cancelLaunch()
-        }
+
     launchAnim.stop()
     cancelAnim.start()
 }
