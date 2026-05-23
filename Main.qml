@@ -18,6 +18,19 @@ property real zoomFactor: 1.0
 property real baseDpScale: Math.max(1.0, Screen.pixelDensity / 96.0)
 property real dpScale: baseDpScale * zoomFactor // Ahora es dinámico, ¡escala toda la UI junta!
 
+// Variable global para trackear la posición
+property point mousePos: Qt.point(0, 0)
+
+// Instancia de tu cursor personalizado
+Loader {
+    id: customCursorLoader
+    source: "Aic.qml"
+    visible: false
+}
+Aic {
+    id: customCursor
+    visible: false
+}
 Shortcut {
     sequence: "Ctrl++"
     onActivated: if (root.zoomFactor < 2.5) root.zoomFactor += 0.1
@@ -31,17 +44,23 @@ Shortcut {
     onActivated: root.zoomFactor = 1.0
 }
 
-// --- FORZAR CURSOR (COMPATIBLE CON TÁCTIL) ---
-MouseArea {
-    id: globalCursorArea
-    anchors.fill: parent
-    z: 9999                      // Siempre arriba de todo
-    acceptedButtons: Qt.NoButton // CLAVE: No se roba los clics ni los toques táctiles
-    hoverEnabled: true           // Obliga a Wayland a dibujar la flecha del mouse
-    cursorShape: Qt.ArrowCursor
-}
 
 /* STREAMING_CHUNK:Defining AppIcon component... */
+
+HoverHandler {
+        id: hoverHandler
+        acceptedDevices: PointerDevice.AllDevices
+        onPointChanged: {
+            if (point !== null) {
+                customCursor.x = point.position.x - 2
+                customCursor.y = point.position.y - 2
+                customCursor.visible = true
+            }
+        }
+        onHoveredChanged: {
+            if (!hovered) customCursor.visible = false
+        }
+}
 // ============= COMPONENTE APPICON =============
 component AppIcon: Item {
     id: iconRoot
@@ -118,6 +137,10 @@ ListModel {
 Component.onCompleted: {
     console.log("[vpt] Indexando aplicaciones del sistema...")
     var systemApps = AppBackend.loadDesktopApps()
+    console.log("[vpt] Apps encontradas: " + systemApps.length)
+        for (var x = 0; x < systemApps.length; x++) {
+            console.log("[vpt] App " + x + ": " + systemApps[x].name + " -> " + systemApps[x].exec)
+        }
 
     for (var i = 0; i < systemApps.length; i++) {
         var appData = systemApps[i]
@@ -125,7 +148,7 @@ Component.onCompleted: {
         baseSearchModel.append(appData)
 
         // Agregamos las primeras 8 apps al grid principal (o puedes filtrarlas por categoría)
-        if (i < 8) {
+        if (i < systemApps.length) {
             appModel.append(appData)
         }
     }
@@ -168,16 +191,14 @@ function updateSearchFilter(text) {
         return
     }
 
-    // 3. MODO SISTEMA (#)
     if (prefix === '#') {
         var sysCmds = [
-            {n: "Apagar", c: "Sistema", e: "VPT_SYS|poweroff"},
-            {n: "Reiniciar", c: "Sistema", e: "VPT_SYS|reboot"},
-            {n: "Subir Volumen", c: "Audio", e: "VPT_SYS|amixer sset Master 10%+"},
-            {n: "Bajar Volumen", c: "Audio", e: "VPT_SYS|amixer sset Master 10%-"},
-            {n: "Brillo Alto", c: "Pantalla", e: "VPT_SYS|brightnessctl set 100%"},
-            {n: "Brillo Bajo", c: "Pantalla", e: "VPT_SYS|brightnessctl set 10%"},
-            {n: "Configurar Red (WiFi)", c: "Redes", e: "VPT_SYS|kitty -e nmtui"}
+            {n: "Apagar", c: "Alimentación", e: "VPT_SYS|poweroff"},
+            {n: "Reiniciar", c: "Alimentación", e: "VPT_SYS|reboot"},
+            {n: "Salir a TTY", c: "Alimentación", e: "VPT_SYS|exit_vpt"},
+            {n: "Ajustar Volumen", c: "Audio", e: "VPT_SYS|volume"},
+            {n: "Ajustar Brillo", c: "Pantalla", e: "VPT_SYS|brightness"},
+            {n: "Redes WiFi", c: "Redes", e: "VPT_SYS|wifi"}
         ]
 
         for (var j = 0; j < sysCmds.length; j++) {
@@ -185,7 +206,7 @@ function updateSearchFilter(text) {
                 filteredSearchModel.append({
                     name: sysCmds[j].n,
                     category: sysCmds[j].c,
-                    icon: "", // Puedes asignar iconos si los tienes
+                    icon: "",
                     exec: sysCmds[j].e
                 })
             }
@@ -203,21 +224,50 @@ function updateSearchFilter(text) {
     }
 }
 
+// MAIN.qml – función executeSmartAction (dentro del scope de la Window)
 function executeSmartAction(execString, appName) {
-    console.log("[vpt] Procesando acción inteligente: " + execString)
+    console.log("[vpt] Acción inteligente:", execString)
+    hideAllPopups()
 
     if (execString.startsWith("VPT_CMD|")) {
         var cmd = execString.substring(8)
-        if (cmd.length > 0) AppBackend.openApp("kitty -e " + cmd)
+        if (cmd.length > 0) {
+            terminalPopup.command = cmd
+            terminalPopup.open()
+        }
     }
     else if (execString.startsWith("VPT_APT|")) {
         var pkg = execString.substring(8)
-        // Usa 'su -c' para pedir password de root en la terminal y luego instalar
-        if (pkg.length > 0) AppBackend.openApp("kitty -e su -c 'apt update && apt install -y " + pkg + "; echo Presiona Enter para salir; read'")
+        if (pkg.length > 0) {
+            aptPopup.packageName = pkg
+            aptPopup.open()
+        }
     }
     else if (execString.startsWith("VPT_SYS|")) {
         var sysCmd = execString.substring(8)
-        AppBackend.openApp(sysCmd)
+
+        // ⚠️ Aquí usamos switch/case con los valores reales que generamos
+        switch(sysCmd) {
+        case "poweroff":
+        case "reboot":
+        case "exit_vpt":
+            powerPopup.action = sysCmd
+            powerPopup.open()
+            break
+        case "volume":
+            volumePopup.open()
+            break
+        case "brightness":
+            brightnessPopup.open()
+            break
+        case "wifi":
+            wifiPopup.open()
+            break
+        default:
+            // Cualquier otro comando directo (ej: kitty -e nmtui)
+            AppBackend.openApp(sysCmd)
+            break
+        }
     }
     else {
         // App normal
@@ -225,6 +275,411 @@ function executeSmartAction(execString, appName) {
     }
 
     searchOverlay.state = "HIDDEN"
+}
+
+function hideAllPopups() {
+    terminalPopup.close()
+    powerPopup.close()
+    volumePopup.close()
+    brightnessPopup.close()
+    wifiPopup.close()
+    aptPopup.close()
+}
+
+StyledPopup {
+    id: terminalPopup
+    property string command: ""
+    width: Math.min(700 * dpScale, root.width * 0.9)
+    height: 400 * dpScale
+    accentColor: "#00e676"
+    popupRadius: 12
+
+    onOpened: {
+        outputArea.text = "Ejecutando: " + command + "\n"
+        AppBackend.runCommandWithOutput(command)
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 15 * dpScale
+
+        // Cabecera
+        Text {
+            text: "Resultado del comando"
+            font.pixelSize: 18 * dpScale
+            color: "#ffffff"
+            font.bold: true
+        }
+
+        // Área de salida
+        ScrollView {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            TextArea {
+                id: outputArea
+                readOnly: true
+                color: "#ccddee"
+                font.family: "Fira Code, monospace"
+                font.pixelSize: 13 * dpScale
+                background: Rectangle {
+                    color: "#0e0e18"
+                    radius: 8
+                    border.color: "#2a2a3a"
+                }
+                padding: 10
+            }
+        }
+
+        // Botón estilizado
+        StyledButton {
+            text: "Cerrar"
+            Layout.alignment: Qt.AlignRight
+            onClicked: terminalPopup.close()
+        }
+    }
+
+    Connections {
+        target: AppBackend
+        function onCommandOutput(output) {
+            outputArea.append(output)
+        }
+    }
+}
+
+StyledPopup {
+    id: powerPopup
+    property string action: ""
+    width: 300 * dpScale
+    height: 280 * dpScale
+    accentColor: "#ff5252"
+    popupRadius: 16
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 12 * dpScale
+
+        Text {
+            text: "Opciones de energía"
+            font.pixelSize: 18 * dpScale
+            color: "#ffffff"
+            font.bold: true
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        StyledButton {
+            text: "⏻  Apagar"
+            buttonColor: "#ff5252"
+            Layout.fillWidth: true
+            onClicked: {
+                AppBackend.openApp("loginctl poweroff")
+                powerPopup.close()
+            }
+        }
+        StyledButton {
+            text: "↻  Reiniciar"
+            buttonColor: "#ffa726"
+            Layout.fillWidth: true
+            onClicked: {
+                AppBackend.openApp("loginctl reboot")
+                powerPopup.close()
+            }
+        }
+        StyledButton {
+            text: "↩  Salir a TTY"
+            Layout.fillWidth: true
+            onClicked: {
+                AppBackend.openApp("loginctl terminate-session $XDG_SESSION_ID")
+                powerPopup.close()
+            }
+        }
+        StyledButton {
+            text: "Cancelar"
+            buttonColor: "#666666"
+            Layout.fillWidth: true
+            onClicked: powerPopup.close()
+        }
+    }
+}
+
+StyledPopup {
+    id: volumePopup
+    width: 350 * dpScale
+    height: 200 * dpScale
+    accentColor: "#29b6f6"
+
+    onOpened: {
+        volSlider.value = AppBackend.getVolume()
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 15 * dpScale
+
+        Text {
+            text: "Ajustar volumen"
+            font.pixelSize: 18 * dpScale
+            color: "#ffffff"
+            font.bold: true
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Text {
+                text: "🔈"
+                font.pixelSize: 20 * dpScale
+            }
+            Slider {
+                id: volSlider
+                from: 0; to: 100; stepSize: 1
+                Layout.fillWidth: true
+                background: Rectangle {
+                    x: volSlider.leftPadding
+                    y: volSlider.topPadding + volSlider.availableHeight / 2 - height / 2
+                    implicitWidth: 200
+                    implicitHeight: 4
+                    width: volSlider.availableWidth
+                    height: implicitHeight
+                    radius: 2
+                    color: "#3a3a4a"
+                    Rectangle {
+                        width: volSlider.visualPosition * parent.width
+                        height: parent.height
+                        color: "#29b6f6"
+                        radius: 2
+                    }
+                }
+                onValueChanged: AppBackend.setVolume(value)
+            }
+            Text {
+                text: "🔊"
+                font.pixelSize: 20 * dpScale
+            }
+            Text {
+                text: Math.round(volSlider.value) + "%"
+                color: "#ffffff"
+                font.bold: true
+                Layout.preferredWidth: 40 * dpScale
+            }
+        }
+
+        StyledButton {
+            text: "Probar sonido"
+            Layout.alignment: Qt.AlignHCenter
+            onClicked: AppBackend.playTestSound()
+        }
+    }
+}
+
+StyledPopup {
+    id: brightnessPopup
+    width: 350 * dpScale
+    height: 180 * dpScale
+    accentColor: "#ffd54f"
+
+    onOpened: {
+        briSlider.value = AppBackend.getBrightness()
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 15 * dpScale
+
+        Text {
+            text: "Ajustar brillo"
+            font.pixelSize: 18 * dpScale
+            color: "#ffffff"
+            font.bold: true
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Text { text: "☀️"; font.pixelSize: 20 * dpScale }
+            Slider {
+                id: briSlider
+                from: 0; to: 100; stepSize: 1
+                Layout.fillWidth: true
+                background: Rectangle {
+                    x: briSlider.leftPadding
+                    y: briSlider.topPadding + briSlider.availableHeight / 2 - height / 2
+                    implicitWidth: 200; implicitHeight: 4
+                    width: briSlider.availableWidth; height: implicitHeight
+                    radius: 2; color: "#3a3a4a"
+                    Rectangle {
+                        width: briSlider.visualPosition * parent.width
+                        height: parent.height
+                        color: "#ffd54f"; radius: 2
+                    }
+                }
+                onValueChanged: AppBackend.setBrightness(value)
+            }
+            Text {
+                text: Math.round(briSlider.value) + "%"
+                color: "#ffffff"
+                font.bold: true
+                Layout.preferredWidth: 40 * dpScale
+            }
+        }
+    }
+}
+
+StyledPopup {
+    id: wifiPopup
+    width: 400 * dpScale
+    height: 450 * dpScale
+    accentColor: "#4fc3f7"
+
+    ListModel { id: wifiModel }
+
+    onOpened: {
+        var networks = AppBackend.scanWifi()
+        wifiModel.clear()
+        for (var i = 0; i < networks.length; i++) {
+            wifiModel.append(networks[i])
+        }
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 12 * dpScale
+
+        Text {
+            text: "Redes WiFi disponibles"
+            font.pixelSize: 18 * dpScale
+            color: "#ffffff"
+            font.bold: true
+        }
+
+        ListView {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            model: wifiModel
+            clip: true
+            delegate: ItemDelegate {
+                width: ListView.view.width
+                text: modelData.ssid + (modelData.encrypted ? " 🔒" : "")
+                background: Rectangle {
+                    color: hovered ? "#2a2a3a" : "transparent"
+                    radius: 6
+                }
+                onClicked: {
+                    if (modelData.encrypted) {
+                                        // Pedir contraseña
+                    } else {
+                        AppBackend.connectWifi(modelData.ssid, "")
+                        wifiPopup.close()
+                    }
+                }
+            }
+        }
+
+        StyledButton {
+            text: "Configurar adaptador WiFi"
+            Layout.fillWidth: true
+            onClicked: AppBackend.openApp("kitty -e nmtui")
+        }
+    }
+}
+
+StyledPopup {
+    id: aptPopup
+    property string packageName: ""
+    width: 500 * dpScale
+    height: 400 * dpScale
+    closePolicy: Popup.NoClose
+    accentColor: "#ce93d8"
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 15 * dpScale
+
+        Text {
+            text: "Instalar paquete: " + aptPopup.packageName
+            font.pixelSize: 18 * dpScale
+            color: "#ffffff"
+            font.bold: true
+        }
+
+        TextField {
+            id: passwordField
+            echoMode: TextInput.Password
+            placeholderText: "Contraseña de sudo"
+            Layout.fillWidth: true
+            background: Rectangle {
+                radius: 8
+                color: "#1e1e2e"
+                border.color: "#4fc3f7"
+            }
+            color: "#ffffff"
+        }
+
+        ProgressBar {
+            id: progressBar
+            from: 0; to: 100
+            value: 0
+            Layout.fillWidth: true
+            visible: false
+            background: Rectangle {
+                implicitWidth: 200; implicitHeight: 6
+                color: "#3a3a4a"
+                radius: 3
+            }
+            contentItem: Item {
+                Rectangle {
+                    width: progressBar.visualPosition * parent.width
+                    height: parent.height
+                    radius: 3
+                    color: "#ce93d8"
+                }
+            }
+        }
+
+        ScrollView {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            TextArea {
+                id: aptLog
+                readOnly: true
+                color: "#ccddee"
+                font.family: "monospace"
+                font.pixelSize: 12 * dpScale
+                background: Rectangle {
+                    color: "#0e0e18"
+                    radius: 8
+                    border.color: "#2a2a3a"
+                }
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            StyledButton {
+                text: "Instalar"
+                buttonColor: "#ce93d8"
+                onClicked: {
+                    if (passwordField.text === "") return
+                    aptLog.text = "Iniciando instalación...\n"
+                    progressBar.visible = true
+                    AppBackend.aptInstall(aptPopup.packageName, passwordField.text)
+                }
+            }
+            StyledButton {
+                text: "Cerrar"
+                onClicked: aptPopup.close()
+            }
+        }
+    }
+
+    Connections {
+        target: AppBackend
+        function onAptProgress(percent, line) {
+            progressBar.value = percent
+            aptLog.append(line)
+        }
+        function onAptFinished(success) {
+            aptLog.append(success ? "Instalación completada." : "Error en la instalación.")
+            progressBar.visible = false
+        }
+    }
 }
 
 /* STREAMING_CHUNK:Building the main layout and Top Bar... */
@@ -573,11 +1028,10 @@ Item {
                                                 anchors.fill: parent
                                                 hoverEnabled: true
                                                 onClicked: {
-                                                    console.log("[vpt] Lanzado desde búsqueda: " + name)
-                                                    AppBackend.openApp(model.exec) // <-- Ejecutando el comando real
-                                                    searchOverlay.state = "HIDDEN"
+                                                    console.log("[vpt] Clic en resultado: " + name)
+                                                    executeSmartAction(model.exec, name)
                                                 }
-                    }
+                        }
                 }
             }
 
@@ -820,6 +1274,5 @@ function cancelLaunch() {
     launchAnim.stop()
     cancelAnim.start()
 }
-
 
 }

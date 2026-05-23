@@ -17,6 +17,9 @@ qt_add_qml_module(appvpt01
     QML_FILES
         Main.qml
         SOURCES backend.h backend.cpp
+        QML_FILES Aic.qml
+        QML_FILES StyledPopup.qml
+        QML_FILES StyledButton.qml
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
