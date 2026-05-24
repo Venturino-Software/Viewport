@@ -80,6 +80,7 @@ jobs:
           
           # Incluir el .deb desde la ruta absoluta
           reprepro -b . includedeb unstable /tmp/viewport.deb
+          reprepro -b . export
           
           # Preparar sitio web
           echo "vpt.soyss.cc" > CNAME
