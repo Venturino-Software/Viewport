@@ -1,6 +1,6 @@
 /*
  * Viewport - Sistema de entorno gráfico minimalista
- * Copyright (C) 2026 VPT
+ * Copyright (C) 2026 VNT
  *
  * Este programa es software libre: puedes redistribuirlo y/o modificarlo
  * bajo los términos de la Licencia Pública General de GNU según es publicada
