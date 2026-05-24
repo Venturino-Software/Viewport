@@ -1,0 +1,98 @@
+name: Generar Paquete DEB (>unstable)
+
+on:
+  push:
+    branches:
+      - "main" # Se ejecuta solo cuando lanzas algo definitivo a main
+
+permissions:
+  contents: write
+
+jobs:
+  deploy-apt-repo:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Descargar código fuente
+        uses: actions/checkout@v4
+
+      - name: Instalar dependencias del sistema
+        run: |
+          sudo apt-get update
+          # Agregamos reprepro a esta lista:
+          sudo apt-get install -y build-essential cmake ninja-build \
+                                  libgl1-mesa-dev libxkbcommon-dev \
+                                  libvulkan-dev libdbus-1-dev reprepro
+
+      - name: Instalar Qt 6.4.2
+        id: qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.4.2'
+          aqtversion: '==3.1.5'
+          
+      - name: Compilar Viewport (appvpt01)
+        run: |
+          # Aquí le decimos a CMake: "busca Qt en la ruta que guardó el paso 'qt'"
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${{ steps.qt.outputs.qt_prefix }}
+          
+          # Compila el binario
+          cmake --build build
+
+      - name: Crear y empaquetar .deb
+        run: |
+          mkdir -p debian_package/vpt/bin
+          mkdir -p debian_package/DEBIAN
+
+          # NEW: for ATP
+          cp build/appvpt01 debian_package/vpt/bin/viewport
+          
+          # Si no hay etiqueta, usamos el número de ejecución
+          VERSION="1.0.${{ github.run_number }}"
+          
+          # Usamos cat sin comillas en EOF para que se expandan las variables
+          cat <<EOF > debian_package/DEBIAN/control
+          Package: viewport
+          Version: $VERSION
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: VNT <zeus.ruffo@icloud.com>
+          Depends: libqt6quick6, libqt6core6, libqt6gui6, libqt6qml6
+          Description: Entorno grafico ultraligero y ultracustomizable.
+          EOF
+          
+          # Construimos y movemos inmediatamente a /tmp (ruta absoluta, segura)
+          dpkg-deb --build debian_package viewport_unstable.deb
+          mv viewport_unstable.deb /tmp/viewport.deb
+
+      - name: Configurar y publicar en repositorio APT
+        run: |
+          # Cambiamos a la rama gh-pages (el workspace se limpia aquí, pero /tmp/viewport.deb sobrevive)
+          git fetch origin
+          git checkout gh-pages || git checkout --orphan gh-pages
+          
+          # Crear estructura mínima de reprepro
+          mkdir -p conf
+          cat <<EOF > conf/distributions
+          Origin: Viewport Repository
+          Label: Viewport APT
+          Codename: unstable
+          Architectures: amd64
+          Components: main
+          Description: Repositorio inestable para Viewport
+          EOF
+          
+          # Incluir el .deb desde la ruta absoluta
+          reprepro -b . includedeb unstable /tmp/viewport.deb
+          reprepro -b . export
+          
+          # Preparar sitio web
+          echo "vpt.soyss.cc" > CNAME
+          
+          # Push
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          git add dists/ pool/ conf/ CNAME
+          git commit -m "🚀 Actualización APT: $(date)"
+          git push origin gh-pages --force

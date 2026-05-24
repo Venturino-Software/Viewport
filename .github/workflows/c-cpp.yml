@@ -1,0 +1,83 @@
+name: Construir y Publicar
+
+# 1. ¿Cuándo se activa este robot?
+# Solo cuando subes código a la rama "beta"
+on:
+  push:
+    branches:
+      - "beta"
+
+# Permisos necesarios para que el robot pueda crear la Release
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-22.04
+
+    steps:
+      # Paso 1: Clonar el código fuente (main.cpp, qmls, backend, CMakeLists)
+      - name: Descargar código fuente
+        uses: actions/checkout@v4
+
+      # Paso 2: Instalar las herramientas base de Linux necesarias para Qt6
+      - name: Instalar dependencias del sistema (OpenGL, DBus, XKB)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build \
+                                  libgl1-mesa-dev libxkbcommon-dev \
+                                  libvulkan-dev libdbus-1-dev
+
+      # Paso 3: Instalar la versión EXACTA de Qt que pediste
+      # Qt 6.4.2 ya trae por defecto Core, Gui, Qml, Quick, Network, OpenGL y DBus
+      - name: Instalar Qt 6.4.2
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.4.2'
+          aqtversion: '==3.1.5'
+
+      # Paso 4: Ensamblar usando CMake
+      - name: Compilar Viewport (appvpt01)
+        run: |
+          # Genera los archivos de construcción en la carpeta "build"
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          # Compila el binario
+          cmake --build build
+
+      # Paso 5: Preparar el paquete con el formato solicitado
+      - name: Ensamblar archivo tar.gz
+        run: |
+          mkdir -p release_package
+          
+          # Mover el binario recién compilado (asumiendo que CMake lo dejó en build/)
+          cp build/appvpt01 release_package/
+          
+          # Mover todos los archivos QML que estén en la raíz
+          # (Si los QML están en una subcarpeta, cambia esto a cp -r tu_carpeta_qml/* release_package/)
+          cp *.qml release_package/ || true
+          
+          # Crear el archivo tar.gz final
+          tar -czvf viewport-beta.tar.gz -C release_package .
+
+      # Paso 6: Crear un tag dinámico basado en la fecha y el commit (ej. beta-20260524-a1b2c3d)
+      - name: Generar tag de la versión
+        id: vars
+        run: echo "tag=beta-$(date +'%Y%m%d')-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      # Paso 7: Publicar como "Pre-Release" en GitHub
+      - name: Publicar Pre-Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: "Viewport Beta Update (${{ steps.vars.outputs.tag }})"
+          body: |
+            **Nueva versión Beta automática**
+            Esta versión ha sido generada automáticamente por el CI/CD desde la rama `beta`.
+            
+            **Contenido del paquete (`viewport-beta.tar.gz`):**
+            - Binario `appvpt01` compilado en Ubuntu 22.04 (Qt 6.4.2)
+            - Archivos de interfaz `.qml`
+          files: viewport-beta.tar.gz
+          prerelease: true # ¡Esto lo marca como BETA y no como estable!
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

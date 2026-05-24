@@ -14,6 +14,7 @@ qt_add_executable(appvpt01
 
 qt_add_qml_module(appvpt01
     URI vpt01
+    VERSION 1.0
     SOURCES backend.h backend.cpp
     SOURCES iconprovider.h
     QML_FILES build/Desktop_Qt_6_11_1-Release/FontManager.qml
