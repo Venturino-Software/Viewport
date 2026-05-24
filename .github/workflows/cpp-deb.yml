@@ -18,11 +18,26 @@ jobs:
 
       # [PASO DE COMPILACIÓN ANTERIOR]
       # Supongamos que aquí compilas tu binario 'appvpt01' como hicimos en el script beta...
-      - name: Instalar dependencias y compilar
+      # ... (tienes el código arriba)
+
+      # Paso 3: Instalar la versión EXACTA de Qt
+      - name: Instalar Qt 6.4.2
+        id: qt # <--- ESTO ES LO NUEVO: Le ponemos un ID al paso
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.4.2'
+          aqtversion: '==3.1.5'
+
+      # Paso 4: Ensamblar usando CMake (Modificado)
+      - name: Compilar Viewport (appvpt01)
         run: |
-          sudo apt-get update && sudo apt-get install -y build-essential cmake ninja-build libgl1-mesa-dev libxkbcommon-dev libvulkan-dev libdbus-1-dev reprepro
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          # Aquí le decimos a CMake: "busca Qt en la ruta que guardó el paso 'qt'"
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${{ steps.qt.outputs.qt_prefix }}
+          
+          # Compila el binario
           cmake --build build
+      
+      # ... (resto del código)
 
       # Paso 2: Estructurar y construir el paquete .deb artesanalmente
       - name: Crear Estructura de Paquete DEB
@@ -73,7 +88,7 @@ jobs:
           
       - name: Configurar dominio personalizado
         run: |
-          echo "repo.dev" > CNAME
+          echo "vpt.soyss.cc" > CNAME
 
       # Paso 6: Subir los cambios de la estructura APT de vuelta a GitHub Pages
       - name: Publicar cambios en GitHub Pages
