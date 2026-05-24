@@ -1,0 +1,85 @@
+name: Generar Paquete DEB (>stable)
+
+on:
+  push:
+    branches:
+      - "main" # Se ejecuta solo cuando lanzas algo definitivo a main
+
+permissions:
+  contents: write
+
+jobs:
+  deploy-apt-repo:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Descargar código fuente
+        uses: actions/checkout@v4
+
+      # [PASO DE COMPILACIÓN ANTERIOR]
+      # Supongamos que aquí compilas tu binario 'appvpt01' como hicimos en el script beta...
+      - name: Instalar dependencias y compilar
+        run: |
+          sudo apt-get update && sudo apt-get install -y build-essential cmake ninja-build libgl1-mesa-dev libxkbcommon-dev libvulkan-dev libdbus-1-dev reprepro
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      # Paso 2: Estructurar y construir el paquete .deb artesanalmente
+      - name: Crear Estructura de Paquete DEB
+        run: |
+          mkdir -p debian_package/usr/local/bin
+          mkdir -p debian_package/DEBIAN
+          
+          # Copiar el binario al destino final que tendrá en el sistema del usuario
+          cp build/appvpt01 debian_package/usr/local/bin/
+          
+          # Crear el archivo de control esencial para APT
+          cat <<EOF > debian_package/DEBIAN/control
+          Package: viewport
+          Version: 1.0.0
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: VNT <tu-email@tudominio.com>
+          Description: Entorno grafico ultraligero y ultracustomizable para kioscos y terminales.
+          EOF
+          
+          # Construir el .deb ejecutable
+          dpkg-deb --build debian_package viewport_1.0.0_amd64.deb
+
+      # Paso 3: Clonar la rama de la página web (gh-pages) donde vive nuestro repositorio APT
+      - name: Preparar rama gh-pages
+        run: |
+          git fetch origin
+          # Si la rama gh-pages ya existe, la clonamos en una carpeta limpia; si no, la creamos
+          git checkout gh-pages || git checkout --orphan gh-pages
+          
+          # Asegurarnos de que exista la configuración para reprepro en esta rama gráfica
+          mkdir -p conf
+          cat <<EOF > conf/distributions
+          Origin: Viewport Repository
+          Label: Viewport APT
+          Codename: stable
+          Architectures: amd64
+          Components: main
+          Description: Repositorio oficial para el entorno ligero Viewport
+          EOF
+
+      # Paso 4: Inyectar el nuevo .deb en la estructura del repositorio usando reprepro
+      - name: Incluir DEB en el repositorio APT
+        run: |
+          # Añadimos el .deb que construimos en el paso 2
+          reprepro -b . include deb stable ../viewport_1.0.0_amd64.deb
+          
+      - name: Configurar dominio personalizado
+        run: |
+          echo "repo.dev" > CNAME
+
+      # Paso 6: Subir los cambios de la estructura APT de vuelta a GitHub Pages
+      - name: Publicar cambios en GitHub Pages
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          git add dists/ pool/ conf/ CNAME
+          git commit -m "🚀 Repositorio APT actualizado automáticamente - Versión 1.0.0"
+          git push origin gh-pages --force
