@@ -41,9 +41,11 @@ jobs:
 
       - name: Crear y empaquetar .deb
         run: |
-          mkdir -p debian_package/usr/local/bin
+          mkdir -p debian_package/vpt/bin
           mkdir -p debian_package/DEBIAN
-          cp build/appvpt01 debian_package/usr/local/bin/
+
+          # NEW: for ATP
+          cp build/appvpt01 debian_package/vpt/bin/viewport
           
           # Si no hay etiqueta, usamos el número de ejecución
           VERSION="1.0.${{ github.run_number }}"
