@@ -23,16 +23,14 @@ jobs:
           sudo apt-get install -y build-essential cmake ninja-build \
                                   libgl1-mesa-dev libxkbcommon-dev \
                                   libvulkan-dev libdbus-1-dev reprepro
-                                  
-      # Paso 3: Instalar la versión EXACTA de Qt
+
       - name: Instalar Qt 6.4.2
-        id: qt # <--- ESTO ES LO NUEVO: Le ponemos un ID al paso
+        id: qt
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.4.2'
           aqtversion: '==3.1.5'
-
-      # Paso 4: Ensamblar usando CMake (Modificado)
+          
       - name: Compilar Viewport (appvpt01)
         run: |
           # Aquí le decimos a CMake: "busca Qt en la ruta que guardó el paso 'qt'"
@@ -47,13 +45,18 @@ jobs:
           mkdir -p debian_package/DEBIAN
           cp build/appvpt01 debian_package/usr/local/bin/
           
+          # Si no hay etiqueta, usamos el número de ejecución
+          VERSION="1.0.${{ github.run_number }}"
+          
+          # Usamos cat sin comillas en EOF para que se expandan las variables
           cat <<EOF > debian_package/DEBIAN/control
           Package: viewport
-          Version: 1.0.0
+          Version: $VERSION
           Section: utils
           Priority: optional
           Architecture: amd64
-          Maintainer: Zeus <zeus.ruffo@icloud.com>
+          Maintainer: VNT <zeus.ruffo@icloud.com>
+          Depends: libqt6quick6, libqt6core6, libqt6gui6, libqt6qml6
           Description: Entorno grafico ultraligero y ultracustomizable.
           EOF
           
