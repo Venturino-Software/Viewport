@@ -14,13 +14,8 @@ qt_add_executable(appvpt01
 
 qt_add_qml_module(appvpt01
     URI vpt01
-    QML_FILES
-        Main.qml
-        SOURCES backend.h backend.cpp
-        QML_FILES
-        QML_FILES StyledPopup.qml
-        QML_FILES StyledButton.qml
-        QML_FILES FirstStart.qml
+    SOURCES backend.h backend.cpp
+    SOURCES iconprovider.h
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
@@ -38,8 +33,19 @@ target_link_libraries(appvpt01
     PRIVATE Qt6::Quick
 )
 
+file(COPY Main.qml StyledPopup.qml StyledButton.qml FirstStart.qml
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
+)
+# 1. Instalar el ejecutable directamente en 'bin'
 install(TARGETS appvpt01
-    BUNDLE DESTINATION .
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    RUNTIME DESTINATION bin
+)
+
+# 2. Instalar los archivos QML en el mismo lugar
+install(FILES
+    Main.qml
+    StyledPopup.qml
+    StyledButton.qml
+    FirstStart.qml
+    DESTINATION bin
 )

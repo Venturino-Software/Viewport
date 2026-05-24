@@ -1,4 +1,10 @@
-/* STREAMING_CHUNK:Configuring root window and properties... */
+/*
+
+  Viewport Main QML
+
+  idk
+
+*/
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -58,33 +64,40 @@ component AppIcon: Item {
         border.color: Qt.rgba(1, 1, 1, 0.12)
     }
 
-    // Texto fallback para cuando no hay imagen
+    // Texto fallback
     Text {
         anchors.centerIn: parent
         text: iconRoot.appName.length > 0 ? iconRoot.appName.charAt(0).toUpperCase() : ""
         color: "#ffffff"
         font.pixelSize: parent.height * 0.6
         font.weight: Font.Bold
+        // Si el IconImage no encuentra nada, el estado será 'Null' o 'Error'
         visible: img.status !== Image.Ready
         opacity: 0.8
     }
 
+    // AHORA USAMOS IconImage EN LUGAR DE Image
     Image {
-        id: img
-        anchors.fill: parent
-        anchors.margins: 10 * dpScale // Margen interno para el icono
-        source: iconName !== "" ? ("qrc:/" + iconName + ".png") : ""
-        fillMode: Image.PreserveAspectFit
-        smooth: true
-        mipmap: true
-        visible: status === Image.Ready
-        onStatusChanged: {
-            if (status === Image.Error && iconName !== "") {
-                // Silenciamos advertencias excesivas, el fallback (Text) se encargará
-                console.log("Icon not found, using fallback for:", source)
-            }
+            id: img
+            anchors.fill: parent
+            anchors.margins: 10 * dpScale
+
+            // LÓGICA INTELIGENTE:
+            // Si empieza con '/', tratamos el string como ruta absoluta (file://)
+            // Si no, es un nombre de icono del sistema
+            source: iconName.startsWith("/") ? ("file://" + iconName) : ("image://icon/" + iconName)
+
+            fillMode: Image.PreserveAspectFit
+            visible: status === Image.Ready
         }
-    }
+
+        // Text fallback si no carga
+        Text {
+            anchors.centerIn: parent
+            text: iconRoot.appName.charAt(0).toUpperCase()
+            visible: img.status !== Image.Ready // Solo muestra la letra si la imagen falló
+            color: "#ffffff"
+        }
 }
 
 Connections {

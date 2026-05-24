@@ -1,24 +1,33 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
-#include <QQmlContext> // Necesario para setContextProperty
+#include <QQmlContext>
 #include "backend.h"
+#include "iconprovider.h"  // o donde lo pongas
+#include <QIcon> // Asegúrate de incluir esto
 
 int main(int argc, char *argv[])
 {
-    // Como estás usando cage-wayland, es una buena práctica asegurar
-    // que Qt priorice el plugin nativo de Wayland en lugar de XCB/XWayland.
     qputenv("QT_QPA_PLATFORM", "wayland");
-    qputenv("QT_WAYLAND_FORCE_DPI", "physical"); // Usa DPI físico del monitor
-    qputenv("QT_SCALE_FACTOR", "1"); // Para que Qt no sobrescriba nuestro dpScale
+    qputenv("QT_WAYLAND_FORCE_DPI", "physical");
+    qputenv("QT_SCALE_FACTOR", "1");
 
     QGuiApplication app(argc, argv);
 
+    // 1. Definimos las rutas donde sabemos que existen tus iconos
+    QStringList iconPaths;
+    iconPaths << "/usr/share/icons" << "/usr/share/pixmaps" << "/snap/gtk-common-themes/current/share/icons";
+
+    // 2. Le decimos a Qt que añada estas rutas a su búsqueda
+    QIcon::setThemeSearchPaths(iconPaths);
+
+    QIcon::setThemeName("Yaru");
+    QIcon::setFallbackThemeName("hicolor");
+
     QQmlApplicationEngine engine;
 
-    // Instanciamos tu clase puente C++
     Backend appBackend;
 
-    // Registramos la instancia en QML bajo el nombre "AppBackend"
+    engine.addImageProvider("icon", new IconProvider);
     engine.rootContext()->setContextProperty("AppBackend", &appBackend);
 
     QObject::connect(
@@ -28,7 +37,7 @@ int main(int argc, char *argv[])
         []() { QCoreApplication::exit(-1); },
         Qt::QueuedConnection);
 
-    engine.loadFromModule("vpt01", "Main");
+    engine.load(QUrl::fromLocalFile("Main.qml"));
 
     return QGuiApplication::exec();
 }

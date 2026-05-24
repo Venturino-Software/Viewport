@@ -11,6 +11,9 @@
 #include <QVariantMap>
 #include <QStandardPaths>
 #include <QRegularExpression>
+#include <QLocale>
+#include <QSettings>
+#include <QFileInfo>
 
 class Backend : public QObject
 {

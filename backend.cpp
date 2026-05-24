@@ -8,7 +8,7 @@ Backend::~Backend() {
         m_currentProcess->waitForFinished(1000);
     }
 }
-
+/*
 QVariantList Backend::loadDesktopApps() {
     QVariantList apps;
     QStringList paths = {
@@ -40,6 +40,18 @@ QVariantList Backend::loadDesktopApps() {
                         name.replace(QRegularExpression("\\s*\\([^)]*\\)"), "");
                         name = name.trimmed();
                     } else if (line.startsWith("Icon=")) icon = line.mid(5);
+                    // Después de obtener 'icon'
+                    else if (line.startsWith("Icon=")) {
+                        icon = line.mid(5);
+                        // Normalizar icono
+                        if (icon.startsWith('/')) {
+                            if (!QFile::exists(icon)) {
+                                QFileInfo fi(icon);
+                                icon = fi.completeBaseName();
+                                qDebug() << "[C++] Icono como ruta no encontrado, usando nombre de tema:" << icon;
+                            }
+                        }
+                    }
                     else if (line.startsWith("Categories=")) category = line.mid(11);
                     else if (line.startsWith("NoDisplay=true")) noDisplay = true;
                     else if (line.startsWith("Terminal=true")) isTerminal = true;
@@ -75,7 +87,114 @@ QVariantList Backend::loadDesktopApps() {
     }
     return apps;
 }
+*/
 
+
+QVariantList Backend::loadDesktopApps() {
+    QVariantList apps;
+    QStringList paths = {
+        "/usr/share/applications",
+        QDir::homePath() + "/.local/share/applications"
+    };
+
+    // Obtener el idioma del sistema para la localización de los nombres
+    const QString systemLocale = QLocale::system().name();      // ej. "es_MX"
+    const QString shortLocale = systemLocale.split('_').first(); // ej. "es"
+
+    for (const QString &dirPath : paths) {
+        QDir dir(dirPath);
+        if (!dir.exists()) continue;
+
+        const QStringList files = dir.entryList(QStringList() << "*.desktop", QDir::Files);
+        for (const QString &fileName : files) {
+            const QString filePath = dir.absoluteFilePath(fileName);
+            QSettings desktop(filePath, QSettings::IniFormat);
+            desktop.beginGroup("Desktop Entry");
+
+            // Verificar si la entrada está oculta
+            if (desktop.value("NoDisplay", false).toBool() ||
+                desktop.value("Hidden", false).toBool()) {
+                desktop.endGroup();
+                continue;
+            }
+
+            // Obtener nombre localizado: prioridad exacta, luego corta, luego genérico
+            QString name;
+            if (desktop.contains("Name[" + systemLocale + "]")) {
+                name = desktop.value("Name[" + systemLocale + "]").toString();
+            } else if (desktop.contains("Name[" + shortLocale + "]")) {
+                name = desktop.value("Name[" + shortLocale + "]").toString();
+            } else {
+                name = desktop.value("Name").toString();
+            }
+            // Limpiar sufijos entre paréntesis (ej. "Firefox (Navegador)" -> "Firefox")
+            name.replace(QRegularExpression("\\s*\\([^)]*\\)"), "");
+            name = name.trimmed();
+            if (name.isEmpty()) {
+                desktop.endGroup();
+                continue;
+            }
+
+            // Obtener y normalizar el icono
+            QString icon = desktop.value("Icon").toString();
+            if (!icon.isEmpty() && icon.startsWith('/')) {
+                // Es una ruta absoluta; si no existe, usar solo el nombre base
+                if (!QFile::exists(icon)) {
+                    QFileInfo fi(icon);
+                    icon = fi.completeBaseName();  // p.ej. "libreoffice-draw"
+                    qDebug() << "[C++] Icono como ruta no encontrado, usando nombre de tema:" << icon;
+                }
+            }
+
+            // Obtener ejecutable y limpiar marcadores de campo
+            QString exec = desktop.value("Exec").toString();
+            if (exec.isEmpty()) {
+                desktop.endGroup();
+                continue;
+            }
+            exec.replace(QRegularExpression("%[uUfFdDnNikcvm]"), "");
+            exec = exec.trimmed();
+
+            // Si es terminal, envolvemos con kitty
+            if (desktop.value("Terminal", false).toBool()) {
+                exec = "kitty -e " + exec;
+            }
+
+            // Categoría (solo la primera)
+            QString category = desktop.value("Categories").toString();
+            category = category.split(';').first();
+
+            QVariantMap appMap;
+            appMap["name"] = name;
+            appMap["icon"] = icon;
+            appMap["exec"] = exec;
+            appMap["category"] = category;
+            apps.append(appMap);
+
+            desktop.endGroup();
+        }
+    }
+
+    // Si no se encontró ninguna aplicación, cargar unas por defecto
+    if (apps.isEmpty()) {
+        qDebug() << "[C++] No se encontraron .desktops. Cargando apps por defecto.";
+        QVariantMap term;
+        term["name"] = "Terminal";
+        term["icon"] = "utilities-terminal";
+        term["exec"] = "kitty";
+        term["category"] = "System";
+        apps.append(term);
+
+        QVariantMap web;
+        web["name"] = "Navegador";
+        web["icon"] = "browser";
+        web["exec"] = "firefox";
+        web["category"] = "Network";
+        apps.append(web);
+    }
+
+    return apps;
+}
 void Backend::openApp(const QString &execCommand) {
     if (m_currentProcess && m_currentProcess->state() != QProcess::NotRunning) {
         qWarning() << "[C++] Ya hay una app corriendo.";
