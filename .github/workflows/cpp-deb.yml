@@ -69,7 +69,7 @@ jobs:
           Architecture: amd64
           Maintainer: VNT <zeus.ruffo@icloud.com>
           Depends: libqt6core6, libqt6gui6, libqt6qml6, libqt6quick6, libqt6core5compat6
-          Recommends: qt6-qmltooling-plugins, qml6-module-qtquick-controls, fonts-nunito
+          Recommends: fonts-nunito
           Description: Entorno grafico ultraligero y ultracustomizable.
           EOF
           
