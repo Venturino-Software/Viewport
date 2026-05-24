@@ -47,6 +47,15 @@ jobs:
 
           # NEW: for ATP
           cp build/appvpt01 debian_package/vpt/bin/viewport
+          # ¡Copiar los archivos QML!
+          cp Main.qml debian_package/vpt/bin/
+          cp StyledPopup.qml debian_package/vpt/bin/
+          cp StyledButton.qml debian_package/vpt/bin/
+          cp FontManager.qml debian_package/vpt/bin/
+          cp nunito.ttf debian_package/vpt/bin/
+          cp nunitor.ttf debian_package/vpt/bin/
+          cp changaone.qml debian_package/vpt/bin/
+          cp FirstStart.qml debian_package/vpt/bin/
           
           # Si no hay etiqueta, usamos el número de ejecución
           VERSION="1.0.${{ github.run_number }}"
