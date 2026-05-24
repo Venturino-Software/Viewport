@@ -13,6 +13,12 @@ visible: true
 title: qsTr("Viewport Launcher")
 color: "#05050a"  // BGCOLOR
 
+function forceOobeRestart() {
+        console.log("[VPT] Función puente activada. Despertando Loader...")
+        oobeLoader.active = true
+        oobeLoader.source = "qrc:/vpt01/FirstStart.qml"
+    }
+
 // --- SISTEMA DE ESCALADO DINÁMICO (ZOOM) ---
 property real zoomFactor: 1.0
 property real baseDpScale: Math.max(1.0, Screen.pixelDensity / 96.0)
@@ -175,7 +181,8 @@ function updateSearchFilter(text) {
             {n: "Salir a TTY", c: "Alimentación", e: "VPT_SYS|exit_vpt"},
             {n: "Ajustar Volumen", c: "Audio", e: "VPT_SYS|volume"},
             {n: "Ajustar Brillo", c: "Pantalla", e: "VPT_SYS|brightness"},
-            {n: "Redes WiFi", c: "Redes", e: "VPT_SYS|wifi"}
+            {n: "Redes WiFi", c: "Redes", e: "VPT_SYS|wifi"},
+            {n: "Setup", c: "OOBE", e: "VPT_OOBE|"}
         ]
 
         for (var j = 0; j < sysCmds.length; j++) {
@@ -246,12 +253,25 @@ function executeSmartAction(execString, appName) {
             break
         }
     }
+    // 1. En el lugar donde procesás el clic del buscador:
+    else if (execString.startsWith("VPT_OOBE|")) {
+        console.log("[VPT] Ejecutando comando especial de OOBE...")
+            AppBackend.resetSetup()
+            oobeLoader.active = true // ¡Ahora sí existe y se puede activar!
+    }
     else {
         // App normal
         AppBackend.openApp(execString)
     }
 
     searchOverlay.state = "HIDDEN"
+
+            // 2. Limpiá el texto del input para que la próxima vez arranque vacío
+            // Cambiá 'idDelInputText' por el ID real de tu TextField de búsqueda
+            idDelInputText.text = ""
+
+            // 3. Vaciá el modelo filtrado para borrar los resultados visuales de la RAM
+            filteredSearchModel.clear()
 }
 
 function hideAllPopups() {
@@ -559,7 +579,7 @@ StyledPopup {
             text: "Configurar adaptador WiFi"
             Layout.minimumHeight: 44 * dpScale
             Layout.fillWidth: true
-            onClicked: AppBackend.openApp("kitty -e nmtui")
+            onClicked: AppBackend.openApp("/vpt/adm/bin/netconfig.sh")
         }
     }
 }
@@ -1228,6 +1248,8 @@ ParallelAnimation {
         transitionCard.visible = false
         transitionCard.sourceIndex = -1
     }
+
+
 }
 
 // ============= FUNCIONES =============
@@ -1261,5 +1283,12 @@ function cancelLaunch() {
     cancelAnim.start()
 }
 
-
+Loader {
+        id: oobeLoader
+        // Se activa automáticamente cuando tu C++ dice que es el primer arranque
+        active: AppBackend.isFirstRun
+        anchors.fill: parent
+        source: "qrc:/vpt01/FirstStart.qml"
+        z: 99999 // Fuerza a que la interfaz de setup tape TODO el escritorio
+    }
 }

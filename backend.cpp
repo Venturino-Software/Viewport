@@ -195,6 +195,22 @@ QVariantList Backend::scanWifi() {
     }
     return list;
 }
+void Backend::runNS(const QString &args) {
+    QProcess *process = new QProcess();
+
+    // Conectamos señales para ver qué pasa
+    // viewport, conexion total
+    connect(process, &QProcess::readyReadStandardOutput, [=]() {
+        // Aquí podrías emitir una señal a QML para mostrar el log
+        emit logUpdated(process->readAllStandardOutput());
+    });
+
+    // ¡Ojo aquí! Para el sudo, necesitas manejar la entrada de contraseña
+    // o configurar un archivo sudoers para que este script no pida pass
+    // Como entiende Soyzian esta funcion:
+    // proceso: empezar: pica kulo exec, quality lista de strings, ruta de binario/configuracion de internet
+    process->start("pkexec", QStringList() << "/vpt/adm/bin/netconfig.sh" << args);
+}
 
 void Backend::connectWifi(const QString &ssid, const QString &password) {
     QStringList args = {"device", "wifi", "connect", ssid};
@@ -232,4 +248,8 @@ void Backend::aptInstall(const QString &package, const QString &sudoPassword) {
         emit aptFinished(false);
     });
     connect(proc, &QProcess::finished, proc, &QProcess::deleteLater);
+
+    // Ejemplo conceptual en tu C++
+
 }
+
