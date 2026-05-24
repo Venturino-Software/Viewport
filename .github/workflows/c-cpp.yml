@@ -1,4 +1,4 @@
-name: Construir y Publicar Beta (Viewport)
+name: Construir y Publicar
 
 # 1. ¿Cuándo se activa este robot?
 # Solo cuando subes código a la rama "beta"
@@ -71,7 +71,7 @@ jobs:
           tag_name: ${{ steps.vars.outputs.tag }}
           name: "Viewport Beta Update (${{ steps.vars.outputs.tag }})"
           body: |
-            🚀 **Nueva versión Beta automática**
+            **Nueva versión Beta automática**
             Esta versión ha sido generada automáticamente por el CI/CD desde la rama `beta`.
             
             **Contenido del paquete (`viewport-beta.tar.gz`):**
