@@ -16,10 +16,14 @@ jobs:
       - name: Descargar código fuente
         uses: actions/checkout@v4
 
-      # [PASO DE COMPILACIÓN ANTERIOR]
-      # Supongamos que aquí compilas tu binario 'appvpt01' como hicimos en el script beta...
-      # ... (tienes el código arriba)
-
+      - name: Instalar dependencias del sistema
+        run: |
+          sudo apt-get update
+          # Agregamos reprepro a esta lista:
+          sudo apt-get install -y build-essential cmake ninja-build \
+                                  libgl1-mesa-dev libxkbcommon-dev \
+                                  libvulkan-dev libdbus-1-dev reprepro
+                                  
       # Paso 3: Instalar la versión EXACTA de Qt
       - name: Instalar Qt 6.4.2
         id: qt # <--- ESTO ES LO NUEVO: Le ponemos un ID al paso
@@ -55,12 +59,12 @@ jobs:
           Section: utils
           Priority: optional
           Architecture: amd64
-          Maintainer: VNT <tu-email@tudominio.com>
+          Maintainer: VNT <zeus.ruffo@icloud.com>
           Description: Entorno grafico ultraligero y ultracustomizable para kioscos y terminales.
           EOF
           
           # Construir el .deb ejecutable
-          dpkg-deb --build debian_package viewport_1.0.0_amd64.deb
+          dpkg-deb --build debian_package viewport01_amd64.deb
 
       # Paso 3: Clonar la rama de la página web (gh-pages) donde vive nuestro repositorio APT
       - name: Preparar rama gh-pages
@@ -96,5 +100,5 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action Bot"
           git add dists/ pool/ conf/ CNAME
-          git commit -m "🚀 Repositorio APT actualizado automáticamente - Versión 1.0.0"
+          git commit -m "Repositorio APT actualizado automáticamente"
           git push origin gh-pages --force
