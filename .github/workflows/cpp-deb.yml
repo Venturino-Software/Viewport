@@ -68,7 +68,7 @@ jobs:
           Priority: optional
           Architecture: amd64
           Maintainer: VNT <zeus.ruffo@icloud.com>
-          Depends: libqt6quick6, libqt6core6, libqt6gui6, libqt6qml6, qt5compat
+          Depends: libqt6core6, libqt6gui6, libqt6qml6, libqt6quick6, libqt6core5compat6
           Recommends: qt6-qmltooling-plugins, qml6-module-qtquick-controls, fonts-nunito
           Description: Entorno grafico ultraligero y ultracustomizable.
           EOF
