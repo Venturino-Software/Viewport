@@ -66,6 +66,11 @@ jobs:
           # Construir el .deb ejecutable
           dpkg-deb --build debian_package viewport01_amd64.deb
 
+      - name: Guardar paquete en lugar seguro
+        run: |
+          # Movemos el deb a la carpeta temporal del sistema
+          mv viewport_*.deb /tmp/viewport_pkg.deb
+
       # Paso 3: Clonar la rama de la página web (gh-pages) donde vive nuestro repositorio APT
       - name: Preparar rama gh-pages
         run: |
@@ -88,7 +93,7 @@ jobs:
       - name: Incluir DEB en el repositorio APT
         run: |
           # Añadimos el .deb que construimos en el paso 2
-          reprepro -b . includedeb stable ../viewport_1.0.0_amd64.deb
+          reprepro -b . includedeb unstable /tmp/viewport_pkg.deb
           
       - name: Configurar dominio personalizado
         run: |
