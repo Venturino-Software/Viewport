@@ -40,31 +40,6 @@ jobs:
           
           # Compila el binario
           cmake --build build
-      
-      # ... (resto del código)
-
-      # Paso 2: Estructurar y construir el paquete .deb artesanalmente
-      - name: Crear Estructura de Paquete DEB
-        run: |
-          mkdir -p debian_package/usr/local/bin
-          mkdir -p debian_package/DEBIAN
-          
-          # Copiar el binario al destino final que tendrá en el sistema del usuario
-          cp build/appvpt01 debian_package/usr/local/bin/
-          
-          # Crear el archivo de control esencial para APT
-          cat <<EOF > debian_package/DEBIAN/control
-          Package: viewport
-          Version: 1.0.0
-          Section: utils
-          Priority: optional
-          Architecture: amd64
-          Maintainer: VNT <zeus.ruffo@icloud.com>
-          Description: Entorno grafico ultraligero y ultracustomizable para kioscos y terminales.
-          EOF
-          
-          # Construir el .deb ejecutable
-          dpkg-deb --build debian_package viewport01_amd64.deb
 
       - name: Crear y empaquetar .deb
         run: |
