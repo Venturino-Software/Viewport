@@ -1,4 +1,4 @@
-name: Generar Paquete DEB (>stable)
+name: Generar Paquete DEB (>unstable)
 
 on:
   push:
@@ -66,44 +66,52 @@ jobs:
           # Construir el .deb ejecutable
           dpkg-deb --build debian_package viewport01_amd64.deb
 
-      - name: Guardar paquete en lugar seguro
+      - name: Crear y empaquetar .deb
         run: |
-          # Movemos el deb a la carpeta temporal del sistema
-          mv viewport_*.deb /tmp/viewport_pkg.deb
+          mkdir -p debian_package/usr/local/bin
+          mkdir -p debian_package/DEBIAN
+          cp build/appvpt01 debian_package/usr/local/bin/
+          
+          cat <<EOF > debian_package/DEBIAN/control
+          Package: viewport
+          Version: 1.0.0
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Zeus <zeus.ruffo@icloud.com>
+          Description: Entorno grafico ultraligero y ultracustomizable.
+          EOF
+          
+          # Construimos y movemos inmediatamente a /tmp (ruta absoluta, segura)
+          dpkg-deb --build debian_package viewport_unstable.deb
+          mv viewport_unstable.deb /tmp/viewport.deb
 
-      # Paso 3: Clonar la rama de la página web (gh-pages) donde vive nuestro repositorio APT
-      - name: Preparar rama gh-pages
+      - name: Configurar y publicar en repositorio APT
         run: |
+          # Cambiamos a la rama gh-pages (el workspace se limpia aquí, pero /tmp/viewport.deb sobrevive)
           git fetch origin
-          # Si la rama gh-pages ya existe, la clonamos en una carpeta limpia; si no, la creamos
           git checkout gh-pages || git checkout --orphan gh-pages
           
-          # Asegurarnos de que exista la configuración para reprepro en esta rama gráfica
+          # Crear estructura mínima de reprepro
           mkdir -p conf
           cat <<EOF > conf/distributions
           Origin: Viewport Repository
           Label: Viewport APT
-          Codename: stable
+          Codename: unstable
           Architectures: amd64
           Components: main
-          Description: Repositorio oficial para el entorno ligero Viewport
+          Description: Repositorio inestable para Viewport
           EOF
-
-      # Paso 4: Inyectar el nuevo .deb en la estructura del repositorio usando reprepro
-      - name: Incluir DEB en el repositorio APT
-        run: |
-          # Añadimos el .deb que construimos en el paso 2
-          reprepro -b . includedeb unstable /tmp/viewport_pkg.deb
           
-      - name: Configurar dominio personalizado
-        run: |
+          # Incluir el .deb desde la ruta absoluta
+          reprepro -b . includedeb unstable /tmp/viewport.deb
+          
+          # Preparar sitio web
           echo "vpt.soyss.cc" > CNAME
-
-      # Paso 6: Subir los cambios de la estructura APT de vuelta a GitHub Pages
-      - name: Publicar cambios en GitHub Pages
-        run: |
+          
+          # Push
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action Bot"
           git add dists/ pool/ conf/ CNAME
-          git commit -m "Repositorio APT actualizado automáticamente"
+          git commit -m "🚀 Actualización APT: $(date)"
           git push origin gh-pages --force
