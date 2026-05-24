@@ -64,6 +64,9 @@ public:
         }
     }
 
+    Q_INVOKABLE QString readFile(const QString& path);
+    Q_INVOKABLE void writeFile(const QString& path, const QString& content);
+
 signals:
     void appClosed();
     void commandOutput(const QString &text);

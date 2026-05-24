@@ -89,6 +89,26 @@ QVariantList Backend::loadDesktopApps() {
 }
 */
 
+QString Backend::readFile(const QString& path) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "[Backend] No se pudo abrir el archivo:" << path;
+        return QString();
+    }
+    QTextStream stream(&file);
+    return stream.readAll();
+}
+
+void Backend::writeFile(const QString& path, const QString& content) {
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qWarning() << "[Backend] No se pudo escribir el archivo:" << path;
+        return;
+    }
+    QTextStream stream(&file);
+    stream << content;
+    file.close();
+}
 
 QVariantList Backend::loadDesktopApps() {
     QVariantList apps;
@@ -314,6 +334,7 @@ QVariantList Backend::scanWifi() {
     }
     return list;
 }
+
 void Backend::runNS(const QString &args) {
     QProcess *process = new QProcess();
 

@@ -1,9 +1,10 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QIcon>
+#include <QDir>
 #include "backend.h"
-#include "iconprovider.h"  // o donde lo pongas
-#include <QIcon> // Asegúrate de incluir esto
+#include "iconprovider.h"
 
 int main(int argc, char *argv[])
 {
@@ -13,23 +14,52 @@ int main(int argc, char *argv[])
 
     QGuiApplication app(argc, argv);
 
-    // 1. Definimos las rutas donde sabemos que existen tus iconos
+    // 1. Rutas de iconos
     QStringList iconPaths;
-    iconPaths << "/usr/share/icons" << "/usr/share/pixmaps" << "/snap/gtk-common-themes/current/share/icons";
-
-    // 2. Le decimos a Qt que añada estas rutas a su búsqueda
+    iconPaths << "/usr/share/icons"
+              << "/usr/share/pixmaps"
+              << "/snap/gtk-common-themes/current/share/icons";
     QIcon::setThemeSearchPaths(iconPaths);
-
     QIcon::setThemeName("Yaru");
     QIcon::setFallbackThemeName("hicolor");
 
-    QQmlApplicationEngine engine;
-
+    // 2. ✅ CREAR Backend ANTES de exponerlo
     Backend appBackend;
 
-    engine.addImageProvider("icon", new IconProvider);
+    // 3. ✅ Verificar paths necesarios
+    QDir vptDir("/vpt");
+    if (!vptDir.exists()) {
+        qWarning() << "/vpt no existe, creando...";
+        QDir().mkpath("/vpt/etc/sounds");
+        QDir().mkpath("/vpt/share/media");
+        QDir().mkpath("/vpt/adm/bin");
+    }
+
+    // 4. ✅ Verificar archivos requeridos
+    QString testWav = "/vpt/etc/sounds/test.wav";
+    if (!QFile::exists(testWav)) {
+        qWarning() << testWav << "no existe, creando dummy...";
+        QFile file(testWav);
+        if (file.open(QIODevice::WriteOnly)) {
+            file.close();
+        }
+    }
+
+    QString videoPath = "/vpt/share/media/helloworld.mp4";
+    if (!QFile::exists(videoPath)) {
+        qWarning() << videoPath << "no existe!";
+        // Crear directorio si no existe
+        QDir().mkpath("/vpt/share/media");
+    }
+
+    // 5. ✅ Exponer Backend AL CONTEXTO QML
+    QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("AppBackend", &appBackend);
 
+    // 6. ✅ Agregar ImageProvider
+    engine.addImageProvider("icon", new IconProvider);
+
+    // 7. ✅ Conexión de errores
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,
@@ -37,7 +67,13 @@ int main(int argc, char *argv[])
         []() { QCoreApplication::exit(-1); },
         Qt::QueuedConnection);
 
+    // 8. ✅ Cargar QML
     engine.load(QUrl::fromLocalFile("Main.qml"));
 
-    return QGuiApplication::exec();
+    if (engine.rootObjects().isEmpty()) {
+        qCritical() << "Error: No se pudo cargar Main.qml";
+        return -1;
+    }
+
+    return app.exec();
 }

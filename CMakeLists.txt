@@ -4,7 +4,7 @@ project(vpt01 VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick)
+find_package(Qt6 REQUIRED COMPONENTS Quick Core5Compat) # <-- Agrega Core5Compat aquí\\\
 
 qt_standard_project_setup(REQUIRES 6.4)
 
@@ -16,6 +16,7 @@ qt_add_qml_module(appvpt01
     URI vpt01
     SOURCES backend.h backend.cpp
     SOURCES iconprovider.h
+    QML_FILES build/Desktop_Qt_6_11_1-Release/FontManager.qml
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

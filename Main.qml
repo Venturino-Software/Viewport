@@ -9,6 +9,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Shapes
+import Qt5Compat.GraphicalEffects
 
 Window {
 id: root
@@ -156,28 +157,36 @@ Component.onCompleted: {
 function updateSearchFilter(text) {
     filteredSearchModel.clear()
 
-    if (text === "") {
-        for (var i = 0; i < baseSearchModel.count; i++) filteredSearchModel.append(baseSearchModel.get(i))
+    if (!text || text === "") {
+        // recargar todas las apps (o lo que prefieras)
+        for (var i = 0; i < baseSearchModel.count; i++)
+            filteredSearchModel.append(baseSearchModel.get(i))
         return
     }
-
+    const PFX = {
+        TERMINAL: '$',
+        APT: '@',
+        SYSTEM: '#'
+    }
     var prefix = text.charAt(0)
     var query = text.substring(1).trim()
     var lowerQuery = query.toLowerCase()
 
     // 1. MODO CONSOLA ($)
-    if (prefix === '$') {
+    if (prefix === PFX.TERMINAL) {
+        var safeQuery = query.replace(/[;&|`$(){}[\]!#~*?<>\\]/g, '')
         filteredSearchModel.append({
             name: "Ejecutar en terminal",
-            category: query !== "" ? "> " + query : "Escribe un comando...",
-            icon: "kitty", // Usa el ícono de terminal que tengas
-            exec: "VPT_CMD|" + query
+            category: query !== "" ? "> " + safeQuery : "Escribe un comando...",
+            icon: "kitty",
+            exec: "VPT_CMD|" + safeQuery
         })
         return
     }
 
     // 2. MODO INSTALADOR (@)
-    if (prefix === '@') {
+    if (prefix === PFX.APT) {
+        var safePackage = query.replace(/[^a-zA-Z0-9.+-]/g, '').substring(0, 100)
         filteredSearchModel.append({
             name: "Instalar paquete (APT)",
             category: query !== "" ? "apt install " + query : "Escribe el nombre de la app...",
@@ -187,7 +196,7 @@ function updateSearchFilter(text) {
         return
     }
 
-    if (prefix === '#') {
+    if (prefix === PFX.SYSTEM) {
         var sysCmds = [
             {n: "Apagar", c: "Alimentación", e: "VPT_SYS|poweroff"},
             {n: "Reiniciar", c: "Alimentación", e: "VPT_SYS|reboot"},
@@ -199,12 +208,16 @@ function updateSearchFilter(text) {
         ]
 
         for (var j = 0; j < sysCmds.length; j++) {
-            if (query === "" || sysCmds[j].n.toLowerCase().includes(lowerQuery)) {
+            var cmd = sysCmds[j];
+            var match = (query === "" ||
+                         cmd.n.toLowerCase().includes(lowerQuery) ||
+                         cmd.c.toLowerCase().includes(lowerQuery))
+            if (match) {
                 filteredSearchModel.append({
-                    name: sysCmds[j].n,
-                    category: sysCmds[j].c,
+                    name: cmd.n,
+                    category: cmd.c,
                     icon: "",
-                    exec: sysCmds[j].e
+                    exec: cmd.e
                 })
             }
         }
@@ -218,6 +231,14 @@ function updateSearchFilter(text) {
         if (item.name.toLowerCase().includes(lowerText) || item.category.toLowerCase().includes(lowerText)) {
             filteredSearchModel.append(item)
         }
+    }
+    if (filteredSearchModel.count === 0 && text !== "") {
+        filteredSearchModel.append({
+            name: "Sin resultados",
+            category: "",
+            icon: "",
+            exec: ""  // sin acción
+        })
     }
 }
 
@@ -304,6 +325,8 @@ StyledPopup {
     accentColor: "#00e676"
     popupRadius: 12
 
+    fontType: "body"  // El popup usa bodyFont
+
     onOpened: {
         outputArea.text = "Ejecutando: " + command + "\n"
         AppBackend.runCommandWithOutput(command)
@@ -316,6 +339,8 @@ StyledPopup {
         // Cabecera
         Text {
             text: "Resultado del comando"
+            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ?
+                FontManager.titleFontFamily : "DejaVu Sans"
             font.pixelSize: 18 * dpScale
             color: "#ffffff"
             font.bold: true
@@ -329,7 +354,8 @@ StyledPopup {
                 id: outputArea
                 readOnly: true
                 color: "#ccddee"
-                font.family: "Fira Code, monospace"
+                font.family: typeof FontManager !== "undefined" && FontManager.monoFontFamily ?
+                                    FontManager.monoFontFamily : "Fira Code, monospace"
                 font.pixelSize: 13 * dpScale
                 background: Rectangle {
                     color: "#0e0e18"
@@ -371,6 +397,8 @@ StyledPopup {
 
         Text {
             text: "Opciones de energía"
+            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ?
+                FontManager.titleFontFamily : "DejaVu Sans"
             font.pixelSize: 18 * dpScale
             color: "#ffffff"
             font.bold: true
@@ -432,6 +460,8 @@ StyledPopup {
 
         Text {
             text: "Ajustar volumen"
+            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ?
+                FontManager.titleFontFamily : "DejaVu Sans"
             font.pixelSize: 18 * dpScale
             color: "#ffffff"
             font.bold: true
@@ -502,6 +532,8 @@ StyledPopup {
 
         Text {
             text: "Ajustar brillo"
+            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ?
+                FontManager.titleFontFamily : "DejaVu Sans"
             font.pixelSize: 18 * dpScale
             color: "#ffffff"
             font.bold: true
@@ -560,6 +592,8 @@ StyledPopup {
 
         Text {
             text: "Redes WiFi disponibles"
+            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ?
+                FontManager.titleFontFamily : "DejaVu Sans"
             font.pixelSize: 18 * dpScale
             color: "#ffffff"
             font.bold: true
@@ -611,6 +645,8 @@ StyledPopup {
 
         Text {
             text: "Instalar paquete: " + aptPopup.packageName
+            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ?
+                FontManager.titleFontFamily : "DejaVu Sans"
             font.pixelSize: 18 * dpScale
             color: "#ffffff"
             font.bold: true
@@ -816,14 +852,18 @@ Item {
                 Behavior on opacity { NumberAnimation { duration: 200 } }
 
                 // Sombra simulada
-                Rectangle {
-                    anchors.fill: parent
-                    anchors.margins: -2
-                    z: -1
-                    radius: parent.radius + 2
-                    color: Qt.rgba(0,0,0,0.15)
-                    visible: itemTile.state === "HOVER" || itemTile.state === "PRESSED"
-                }
+                RectangularGlow {
+                                    id: tileGlow
+                                    anchors.fill: parent
+                                    glowRadius: 18 * dpScale
+                                    spread: 0.1
+                                    color: Qt.rgba(0.5, 0.6, 1.0, 0.4) // Glow azul eléctrico
+                                    cornerRadius: parent.radius + glowRadius
+                                    z: -1
+                                    // Solo brilla en hover, se apaga al presionar o salir
+                                    opacity: itemTile.state === "HOVER" ? 1.0 : 0.0
+                                    Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutQuad } }
+                                }
 
                 Column {
                     anchors.centerIn: parent
@@ -860,23 +900,28 @@ Item {
                               // Estados hover/pressed con animaciones más ricas
 
 
-                // Estados hover/pressed
-                states: [
-                    State {
-                        name: "HOVER"
-                        when: clickZone.containsMouse && !clickZone.pressed
-                        PropertyChanges { target: itemTile; color: Qt.rgba(1,1,1,0.12); scale: 1.08; border.color: Qt.rgba(0.5,0.6,1.0,0.6) }
-                    },
-                    State {
-                        name: "PRESSED"
-                        when: clickZone.pressed
-                        PropertyChanges { target: itemTile; color: Qt.rgba(0,0,0,0.2); scale: 0.92; border.color: Qt.rgba(0.5,0.6,1.0,1.0) }
-                    }
-                ]
-                transitions: Transition {
-                    NumberAnimation { properties: "scale"; duration: 350; easing.type: Easing.OutBack }
-                    ColorAnimation { properties: "color, border.color"; duration: 200 }
-                }
+                // REEMPLAZA LA "Sombra simulada" POR ESTO:
+
+
+                                // REEMPLAZA TUS STATES Y TRANSITIONS POR ESTOS:
+                                states: [
+                                    State {
+                                        name: "HOVER"
+                                        when: clickZone.containsMouse && !clickZone.pressed
+                                        PropertyChanges { target: itemTile; color: Qt.rgba(1,1,1,0.12); scale: 1.06; border.color: Qt.rgba(0.5,0.6,1.0,0.6) }
+                                    },
+                                    State {
+                                        name: "PRESSED"
+                                        when: clickZone.pressed
+                                        // Al hacer clic, se hunde (0.90) y se oscurece
+                                        PropertyChanges { target: itemTile; color: Qt.rgba(0,0,0,0.3); scale: 0.90; border.color: Qt.rgba(0.5,0.6,1.0,1.0) }
+                                    }
+                                ]
+                                transitions: Transition {
+                                    // OutBack con overshoot da el efecto de rebote elástico
+                                    NumberAnimation { properties: "scale"; duration: 400; easing.type: Easing.OutBack; easing.overshoot: 1.5 }
+                                    ColorAnimation { properties: "color, border.color"; duration: 200 }
+                                }
             }
         }
     }
@@ -892,14 +937,20 @@ Item {
     z: 50
 
     // Fondo oscuro
-    Rectangle {
-        anchors.fill: parent
-        color: Qt.rgba(0.02, 0.02, 0.05, 0.8)
-        MouseArea {
+    // REEMPLAZA EL "Fondo oscuro" POR ESTO:
+        RadialGradient {
             anchors.fill: parent
-            onClicked: searchOverlay.state = "HIDDEN"
+            horizontalOffset: 0
+            verticalOffset: 0
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: Qt.rgba(0.02, 0.02, 0.05, 0.5) } // Centro más claro
+                GradientStop { position: 1.0; color: Qt.rgba(0.02, 0.02, 0.05, 0.95) } // Bordes oscuros
+            }
+            MouseArea {
+                anchors.fill: parent
+                onClicked: searchOverlay.state = "HIDDEN"
+            }
         }
-    }
 
     // Atajos de teclado
     Shortcut {
@@ -928,15 +979,18 @@ Item {
         border.width: 1
         clip: true
 
-        // Sombra panel
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: -4
-            z: -1
-            radius: parent.radius + 2
-            color: Qt.rgba(0,0,0,0.3)
-        }
+        // REEMPLAZA LA "Sombra panel" POR ESTO:
+                RectangularGlow {
+                    anchors.fill: parent
+                    glowRadius: 35 * dpScale
+                    spread: 0.05
+                    color: Qt.rgba(0, 0, 0, 0.6)
+                    cornerRadius: parent.radius + glowRadius
+                    z: -1
 
+                    // La sombra reacciona a la animación de aparición del panel
+                    scale: searchPanel.scale
+                }
         MouseArea { anchors.fill: parent } // evita clics traspasados
 
         ColumnLayout {
@@ -957,15 +1011,38 @@ Item {
                     placeholderText: "Buscar aplicaciones..."
                     placeholderTextColor: "#707080"
 
-                    background: Rectangle {
-                        color: Qt.rgba(0, 0, 0, 0.4)
-                        radius: 14 * dpScale
-                        border.color: searchInput.activeFocus ? "#6688ff" : Qt.rgba(1, 1, 1, 0.15)
-                        border.width: searchInput.activeFocus ? 2 : 1
-                        Behavior on border.color { ColorAnimation { duration: 200 } }
-                    }
+                    Glow {
+                                                anchors.fill: parent
+                                                source: inputBg
+                                                radius: 10 * dpScale
+                                                samples: 20
+                                                color: "#6688ff"
+                                                opacity: searchInput.activeFocus ? 0.35 : 0.0
+                                                transparentBorder: true
+                                                Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutQuad } }
+                                            }
 
-                    onTextChanged: updateSearchFilter(text)
+                    onTextChanged: {
+                        debounceTimer.restart()
+                    }
+                    Timer {
+                        id: debounceTimer
+                        interval: 150
+                        onTriggered: updateSearchFilter(searchField.text)
+                    }
+                    Keys.onReturnPressed: {
+                        if (filteredSearchModel.count > 0) {
+                            var firstItem = filteredSearchModel.get(0)
+                            if (firstItem.exec && firstItem.exec !== "") {
+                                executeSmartAction(firstItem.exec, firstItem.name)
+                            }
+                        }
+                    }
+                    Keys.onEscapePressed: {
+                        searchInput.text = ""
+                        searchOverlay.state = "HIDDEN"
+                        filteredSearchModel.clear()
+                    }
                 }
 
                 Rectangle {
@@ -1051,6 +1128,13 @@ Item {
                                                     executeSmartAction(model.exec, name)
                                                 }
                         }
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: model.exec !== ""  // ← DESHABILITA si es "Sin resultados"
+                        onClicked: {
+                            executeSmartAction(model.exec, model.name)
+                        }
+                    }
                 }
             }
 
