@@ -54,7 +54,7 @@ jobs:
           cp FontManager.qml debian_package/vpt/bin/
           cp nunito.ttf debian_package/vpt/bin/
           cp nunitor.ttf debian_package/vpt/bin/
-          cp changaone.qml debian_package/vpt/bin/
+          cp changaone.ttf debian_package/vpt/bin/
           cp FirstStart.qml debian_package/vpt/bin/
           
           # Si no hay etiqueta, usamos el número de ejecución
@@ -68,7 +68,8 @@ jobs:
           Priority: optional
           Architecture: amd64
           Maintainer: VNT <zeus.ruffo@icloud.com>
-          Depends: libqt6quick6, libqt6core6, libqt6gui6, libqt6qml6
+          Depends: libqt6quick6, libqt6core6, libqt6gui6, libqt6qml6, qt5compat
+          Recommends: qt6-qmltooling-plugins, qml6-module-qtquick-controls, fonts-nunito
           Description: Entorno grafico ultraligero y ultracustomizable.
           EOF
           
