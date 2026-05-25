@@ -77,7 +77,7 @@ jobs:
           dpkg-deb --build debian_package viewport_unstable.deb
           mv viewport_unstable.deb /tmp/viewport.deb
 
-            - name: Configurar, firmar y publicar repositorio APT
+      - name: Configurar, firmar y publicar repositorio APT
         run: |
           # Preparar rama gh-pages
           git fetch origin
