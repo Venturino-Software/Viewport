@@ -117,10 +117,12 @@ jobs:
 
           # --- Importar clave GPG y firmar Release ---
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
-          gpg --batch --yes --pinentry-mode loopback \
-              --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
-              --detach-sign --armor \
-              --output dists/unstable/Release.gpg \
+
+          # Pasar la passphrase por stdin (más seguro)
+          echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --pinentry-mode loopback \
+            --passphrase-fd 0 \
+            --detach-sign --armor \
+            --output dists/unstable/Release.gpg \
               dists/unstable/Release
           # ------------------------------------------------
 
