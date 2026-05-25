@@ -100,8 +100,6 @@ jobs:
 
           # Construir el índice del repositorio
           reprepro -b . clearvanished
-          # CORREGIDO: deleteunmatched seguido del codename (sin --delete)
-          reprepro -b . deleteunmatched unstable
           reprepro -b . includedeb unstable /tmp/viewport.deb
           reprepro -b . export
           reprepro -b . createsymlinks
