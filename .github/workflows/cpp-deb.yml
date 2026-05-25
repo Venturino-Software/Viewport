@@ -30,7 +30,7 @@ jobs:
         with:
           version: '6.4.2'
           aqtversion: '==3.1.5'
-          modules: 'qt5compat'  # 🔴 Cambia qtcore5compat -> qt5compat
+          modules: 'qt5compat'
           
       - name: Compilar Viewport (appvpt01)
         run: |
@@ -68,7 +68,7 @@ jobs:
           Priority: optional
           Architecture: amd64
           Maintainer: VNT <zeus.ruffo@icloud.com>
-          Depends: libqt6core6, libqt6gui6, libqt6qml6, libqt6quick6, libqt6core5compat6
+          Depends: libqt6core6, libqt6gui6, libqt6qml6, libqt6quick6, libqt6core5compat6, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-shapes, qml6-module-qt5compat-graphicaleffects
           Recommends: fonts-nunito
           Description: Entorno grafico ultraligero y ultracustomizable.
           EOF
