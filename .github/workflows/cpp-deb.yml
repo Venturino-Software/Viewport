@@ -124,6 +124,8 @@ jobs:
             --detach-sign --armor \
             --output dists/unstable/Release.gpg \
               dists/unstable/Release
+
+          gpg --armor --export > publickey.asc
           # ------------------------------------------------
 
           echo "vpt.soyss.cc" > CNAME
