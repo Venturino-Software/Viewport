@@ -77,16 +77,18 @@ jobs:
           dpkg-deb --build debian_package viewport_unstable.deb
           mv viewport_unstable.deb /tmp/viewport.deb
 
-      - name: Configurar, firmar y publicar repositorio APT
+            - name: Configurar, firmar y publicar repositorio APT
         run: |
           # Preparar rama gh-pages
           git fetch origin
           git checkout gh-pages || git checkout --orphan gh-pages
-          rm -rf * .??* 2>/dev/null || true
+
+          # Limpiar todo el contenido excepto .git para evitar borrar el repositorio
+          find . -mindepth 1 -maxdepth 1 -not -name '.git' -exec rm -rf {} \;
           rm -rf /tmp/reprepro_temp
           mkdir -p conf
 
-          # Configuración de reprepro (sin SignWith, firmaremos manualmente)
+          # Configuración de reprepro
           cat <<EOF > conf/distributions
           Origin: Viewport Repository
           Label: Viewport APT
@@ -98,7 +100,8 @@ jobs:
 
           # Construir el índice del repositorio
           reprepro -b . clearvanished
-          reprepro -b . --delete deleteunmatched
+          # CORREGIDO: deleteunmatched seguido del codename (sin --delete)
+          reprepro -b . deleteunmatched unstable
           reprepro -b . includedeb unstable /tmp/viewport.deb
           reprepro -b . export
           reprepro -b . createsymlinks
@@ -107,15 +110,16 @@ jobs:
           # Verificar hash de Packages.gz y reexportar si es necesario
           cd dists/unstable
           md5sum main/binary-amd64/Packages.gz > /tmp/check_md5
-          grep -q "$(cat /tmp/check_md5)" Release || {
+          if ! grep -q "$(cat /tmp/check_md5)" Release; then
             echo "⚠️ Regenerando Release manualmente"
-            reprepro -b ../.. export
-          }
-          cd ../..
+            cd ../..
+            reprepro -b . export
+          else
+            cd ../..
+          fi
 
-          # --- NUEVO: Importar clave GPG y firmar Release ---
+          # --- Importar clave GPG y firmar Release ---
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
-          # Firmar de forma separada (Release.gpg)
           gpg --batch --yes --pinentry-mode loopback \
               --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
               --detach-sign --armor \
