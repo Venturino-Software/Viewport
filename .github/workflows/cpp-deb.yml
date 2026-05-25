@@ -79,11 +79,10 @@ jobs:
 
       - name: Configurar y publicar en repositorio APT
         run: |
-          # Cambiamos a la rama gh-pages (el workspace se limpia aquí, pero /tmp/viewport.deb sobrevive)
           git fetch origin
           git checkout gh-pages || git checkout --orphan gh-pages
-          
-          # Crear estructura mínima de reprepro
+          rm -rf * .??* 2>/dev/null || true
+          rm -rf /tmp/reprepro_temp
           mkdir -p conf
           cat <<EOF > conf/distributions
           Origin: Viewport Repository
@@ -93,17 +92,22 @@ jobs:
           Components: main
           Description: Repositorio inestable para Viewport
           EOF
-          
-          # Incluir el .deb desde la ruta absoluta
+          reprepro -b . clearvanished
+          reprepro -b . --delete deleteunmatched
           reprepro -b . includedeb unstable /tmp/viewport.deb
           reprepro -b . export
-          
-          # Preparar sitio web
+          reprepro -b . createsymlinks
+          reprepro -b . gensymbols
+          cd dists/unstable
+          md5sum main/binary-amd64/Packages.gz > /tmp/check_md5
+          grep -q "$(cat /tmp/check_md5)" Release || {
+          echo "⚠️ Regenerando Release manualmente"
+          reprepro -b ../.. export
+          }
+          cd ../..
           echo "vpt.soyss.cc" > CNAME
-          
-          # Push
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action Bot"
-          git add dists/ pool/ conf/ CNAME
-          git commit -m "🚀 Actualización APT: $(date)"
+          git add --all
+          git commit -m "🔧 APT: v${{ github.run_number }}"
           git push origin gh-pages --force
