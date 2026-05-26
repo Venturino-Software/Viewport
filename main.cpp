@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
 {
     qputenv("QT_QPA_PLATFORM", "wayland");
     qputenv("QT_WAYLAND_FORCE_DPI", "physical");
-    qputenv("QT_SCALE_FACTOR", "1");
+    qputenv("QT_SCALE_FACTOR", "1.4");
 
     QGuiApplication app(argc, argv);
 

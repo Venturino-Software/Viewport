@@ -18,6 +18,12 @@ Rectangle {
     color: "#050505" // Fondo negro puro como base de fallback
     z: 99999
 
+    // === PALETA DE COLORES UNIFICADA (Coherencia con tu ecosistema) ===
+    readonly property color accentColor: "#7f99ff"   // El color protagonista
+    readonly property color surfaceColor: "#1a1c2b"  // Igual al bgColor de StyledPopup
+    readonly property color surfaceDark: "#121418"
+    readonly property color surfaceDarker: "#111111"
+
     // ------------------------------------------------------------
     // 1. SISTEMA DE ESCALADO DINÁMICO (DPI / RESOLUCIÓN)
     // ------------------------------------------------------------
@@ -42,35 +48,37 @@ Rectangle {
     // ------------------------------------------------------------
 
     states: [
-            State {
-                name: "videoMode"
-                PropertyChanges { target: videoStage; opacity: 1; visible: true }
-                PropertyChanges { target: installStage; opacity: 0; visible: false }
-            },
-            State {
-                name: "installMode"
-                PropertyChanges { target: videoStage; opacity: 0; visible: false }
-                PropertyChanges { target: installStage; opacity: 1; visible: true }
-            }
-        ]
-        state: "videoMode"
+        State {
+            name: "videoMode"
+            PropertyChanges { target: videoStage; opacity: 1; visible: true }
+            PropertyChanges { target: installStage; opacity: 0; visible: false }
+        },
+        State {
+            name: "installMode"
+            PropertyChanges { target: videoStage; opacity: 0; visible: false }
+            PropertyChanges { target: installStage; opacity: 1; visible: true }
+        }
+    ]
+    state: "videoMode"
 
-        // Animación de opacidad general del componente raíz
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 400
-                easing.type: Easing.InOutQuad
+    // Animación de opacidad general del componente raíz
+    Behavior on opacity {
+        NumberAnimation {
+            duration: 400
+            easing.type: Easing.InOutQuad
 
-                // ¡ESTA ES LA MAGIA! Cuando la animación de desvanecimiento TERMINA:
-                onRunningChanged: {
-                    if (!running && welcomeRoot.opacity === 0) {
-                        console.log("[VPT] Desvanecimiento listo. Destruyendo interfaz de instalación...")
-                        // Apagamos el Loader desde adentro cambiando la propiedad del backend
+            // ¡ESTA ES LA MAGIA! Cuando la animación de desvanecimiento TERMINA:
+            onRunningChanged: {
+                if (!running && welcomeRoot.opacity === 0) {
+                    console.log("[VPT] Desvanecimiento listo. Destruyendo interfaz de instalación...")
+                    // Validación por seguridad para evitar crasheos si el backend no está listo
+                    if (typeof AppBackend !== "undefined") {
                         AppBackend.markSetupAsDone()
                     }
                 }
             }
         }
+    }
 
     // ------------------------------------------------------------
     // 3. ETAPA 1: VÍDEO DE FONDO Y BIENVENIDA
@@ -95,7 +103,8 @@ Rectangle {
             z: 1
         }
 
-        // Botón "Comenzar" estilo píldora neón
+        // Botón "Comenzar"
+        // (Usa Rectangles nativos para evadir GraphicalEffects y asegurar 100% estabilidad)
         Item {
             anchors.bottom: parent.bottom
             anchors.horizontalCenter: parent.horizontalCenter
@@ -103,21 +112,16 @@ Rectangle {
             width: 240 * dp
             height: 60 * dp
             z: 2
-            MouseArea {
-                        anchors.fill: parent
-                        // Al estar habilitado y sin onClicked, absorbe absolutamente
-                        // todos los clics y hovers, impidiendo que atraviesen al fondo.
-                        hoverEnabled: true
-                        preventStealing: true
-                    }
 
             Rectangle {
                 id: startBtnBg
                 anchors.fill: parent
                 radius: height / 2 // Píldora perfecta
-                color: startBtnArea.pressed ? "#111" : (startBtnArea.containsMouse ? "#1a1a1a" : "#0d0d0d")
+
+                // Transiciones coherentes con el Surface Color de tus Popups
+                color: startBtnArea.pressed ? surfaceDarker : (startBtnArea.containsMouse ? surfaceColor : "#0d0d0d")
                 border.width: 1.5 * dp
-                border.color: startBtnArea.containsMouse ? "#00E5FF" : "#333333" // Brillo ATP
+                border.color: startBtnArea.containsMouse ? welcomeRoot.accentColor : "#333333"
 
                 Behavior on color { ColorAnimation { duration: 150 } }
                 Behavior on border.color { ColorAnimation { duration: 250 } }
@@ -126,7 +130,7 @@ Rectangle {
             Text {
                 anchors.centerIn: parent
                 text: "COMENZAR"
-                color: startBtnArea.containsMouse ? "#00E5FF" : "#FFFFFF"
+                color: startBtnArea.containsMouse ? welcomeRoot.accentColor : "#FFFFFF"
                 font.pixelSize: buttonFontSize
                 font.bold: true
                 font.letterSpacing: 2 * dp
@@ -139,6 +143,7 @@ Rectangle {
                 id: startBtnArea
                 anchors.fill: parent
                 hoverEnabled: true
+                preventStealing: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
                     welcomeVideo.stop()
@@ -152,7 +157,7 @@ Rectangle {
     }
 
     // ------------------------------------------------------------
-    // 4. ETAPA 2: INSTALADOR DE HERRAMIENTAS (MODELO + REPEATER)
+    // 4. ETAPA 2: INSTALADOR DE HERRAMIENTAS
     // ------------------------------------------------------------
     Item {
         id: installStage
@@ -177,28 +182,25 @@ Rectangle {
             anchors.topMargin: 100 * dp
         }
 
-        // --- MODELO DE DATOS (Sin necesidad de componentes externos) ---
+        // --- MODELO DE DATOS ---
         ListModel {
             id: cardsModel
             ListElement {
                 cardTitle: "Perfil CERO"
                 cardDesc: "Solo ATP Tools básicas.\nMáximo rendimiento, cero bloatware."
-                cardIcon: "️"
-                themeColor: "#00E5FF" // Cyan
+                cardIcon: "⚙️"
                 scriptTarget: ""
             }
             ListElement {
-                cardTitle: "Perfil MINIMO"
+                cardTitle: "Perfil MÍNIMO"
                 cardDesc: "Herramientas de red + utilidades extra.\nEl arsenal completo."
-                cardIcon: ""
-                themeColor: "#00E5FF" // Verde Hacker
+                cardIcon: "🛠️"
                 scriptTarget: "/vpt/adm/bin/insmin.sh"
             }
             ListElement {
                 cardTitle: "Perfil TODO"
-                cardDesc: "Suites ofirmaticas...\nBloatware..."
-                cardIcon: "️"
-                themeColor: "#00E5FF" // Cyan
+                cardDesc: "Suites ofimáticas...\nBloatware..."
+                cardIcon: "📦"
                 scriptTarget: "/vpt/adm/bin/insall.sh"
             }
         }
@@ -215,25 +217,27 @@ Rectangle {
                     width: cardWidth
                     height: cardHeight
 
-                    // Sombra falsa para dar profundidad
+                    // Sombra falsa estable (Simula Glow sin importar GraphicalEffects)
                     Rectangle {
                         anchors.fill: parent
                         anchors.margins: -4 * dp
                         radius: 18 * dp
                         color: "transparent"
-                        border.width: 1
-                        border.color: cardArea.containsMouse ? model.themeColor : "transparent"
-                        opacity: cardArea.containsMouse ? 0.3 : 0
+                        border.width: 1.5 * dp
+                        border.color: cardArea.containsMouse ? welcomeRoot.accentColor : "transparent"
+                        opacity: cardArea.containsMouse ? 0.35 : 0
                         Behavior on opacity { NumberAnimation { duration: 300 } }
                     }
 
-                    // Tarjeta Principal (Glassmorphism oscuro)
+                    // Tarjeta Principal
                     Rectangle {
                         anchors.fill: parent
                         radius: 16 * dp
-                        color: cardArea.pressed ? "#111111" : (cardArea.containsMouse ? "#1a1c23" : "#121418")
+
+                        // Adaptando el Glassmorphism oscuro a la paleta de StyledPopup
+                        color: cardArea.pressed ? surfaceDarker : (cardArea.containsMouse ? surfaceColor : surfaceDark)
                         border.width: 1 * dp
-                        border.color: cardArea.containsMouse ? model.themeColor : "#2a2d35"
+                        border.color: cardArea.containsMouse ? welcomeRoot.accentColor : "#2a2d35"
 
                         Behavior on color { ColorAnimation { duration: 200 } }
                         Behavior on border.color { ColorAnimation { duration: 300 } }
@@ -254,7 +258,9 @@ Rectangle {
                                 text: model.cardTitle
                                 font.pixelSize: baseFontSize * dp * 1.4
                                 font.bold: true
-                                color: "white"
+                                color: cardArea.containsMouse ? welcomeRoot.accentColor : "white"
+
+                                Behavior on color { ColorAnimation { duration: 200 } }
                             }
 
                             Text {
@@ -276,7 +282,9 @@ Rectangle {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            AppBackend.runGenericScript(model.scriptTarget)
+                            if (typeof AppBackend !== "undefined") {
+                                AppBackend.runGenericScript(model.scriptTarget)
+                            }
                             finalizeSetup()
                         }
                     }
@@ -302,8 +310,8 @@ Rectangle {
     // 5. FUNCIÓN FINAL
     // ------------------------------------------------------------
     function finalizeSetup() {
-            // Al poner la opacidad en 0, se dispara el 'Behavior on opacity' que armamos arriba.
-            // Cuando termina de hacerse invisible (400ms), se borra todo de la RAM automáticamente.
-            welcomeRoot.opacity = 0
-        }
+        // Al poner la opacidad en 0, se dispara el 'Behavior on opacity' que armamos arriba.
+        // Cuando termina de hacerse invisible (400ms), se borra todo de la RAM automáticamente.
+        welcomeRoot.opacity = 0
+    }
 }

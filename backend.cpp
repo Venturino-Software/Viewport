@@ -9,6 +9,7 @@
  */
 
 #include "backend.h"
+#include <qjsvalue.h>
 
 Backend::Backend(QObject *parent) : QObject(parent), m_currentProcess(nullptr) {}
 
@@ -260,23 +261,34 @@ void Backend::openApp(const QString &execCommand) {
     qDebug() << "[C++] Ejecutando:" << program << args;
     m_currentProcess->start(program, args);
 }
-
 void Backend::runCommandWithOutput(const QString &command) {
     QProcess *proc = new QProcess(this);
-    connect(proc, &QProcess::readyReadStandardOutput, this, [proc, this]() {
-        QString text = QString::fromUtf8(proc->readAllStandardOutput());
+    proc->setProcessChannelMode(QProcess::MergedChannels);
+
+    connect(proc, &QProcess::readyRead, this, [proc, this]() {
+        QString text = QString::fromUtf8(proc->readAll());
         if (!text.isEmpty()) emit commandOutput(text);
     });
-    connect(proc, &QProcess::readyReadStandardError, this, [proc, this]() {
-        QString text = QString::fromUtf8(proc->readAllStandardError());
-        if (!text.isEmpty()) emit commandOutput(text);
-    });
+
     connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            proc, &QProcess::deleteLater);
-    connect(proc, &QProcess::errorOccurred, proc, [proc](QProcess::ProcessError) {
+            this, [proc, this](int exitCode) {
+                if (exitCode != 0)
+                    emit commandOutput(QString("\n[Proceso terminado con código %1]").arg(exitCode));
+                proc->deleteLater();
+            });
+
+    connect(proc, &QProcess::errorOccurred, this, [proc, this](QProcess::ProcessError err) {
+        QString msg = "[Error al ejecutar el comando: ";
+        switch (err) {
+        case QProcess::FailedToStart: msg += "No se pudo iniciar]"; break;
+        case QProcess::Crashed: msg += "El proceso crasheó]"; break;
+        default: msg += "Error desconocido]"; break;
+        }
+        emit commandOutput(msg + "\n");
         proc->deleteLater();
     });
-    proc->start(command);
+
+    proc->start("/bin/bash", QStringList() << "-c" << command);
 }
 
 int Backend::getVolume() {
@@ -319,8 +331,32 @@ int Backend::getBrightness() {
 }
 
 void Backend::setBrightness(int val) {
-    QProcess::startDetached("brightnessctl", {"s", QString::number(val) + "%"});
+    QProcess::startDetached("pkexec", QStringList() << "brightnessctl" << "s" << QString::number(val) + "%");
 }
+
+void Backend::runCommandWithSudo(const QString &command, const QString &password, QJSValue callback) {
+    QProcess *proc = new QProcess(this);
+    proc->start("sudo", QStringList() << "-S" << "-p" << "" << "sh" << "-c" << command);
+    proc->write(password.toUtf8() + "\n");
+    proc->closeWriteChannel();
+
+    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [proc, callback, this](int exitCode) {
+                bool success = (exitCode == 0);
+                if (callback.isCallable()) {
+                    callback.call(QJSValueList{success});
+                }
+                proc->deleteLater();
+            });
+
+    connect(proc, &QProcess::errorOccurred, this, [proc, callback](QProcess::ProcessError) {
+        if (callback.isCallable()) {
+            callback.call(QJSValueList{false});
+        }
+        proc->deleteLater();
+    });
+}
+
 
 QVariantList Backend::scanWifi() {
     QVariantList list;
@@ -363,9 +399,10 @@ void Backend::runNS(const QString &args) {
 }
 
 void Backend::connectWifi(const QString &ssid, const QString &password) {
-    QStringList args = {"device", "wifi", "connect", ssid};
+    QStringList args;
+    args << "device" << "wifi" << "connect" << ssid;
     if (!password.isEmpty()) args << "password" << password;
-    QProcess::startDetached("nmcli", args);
+    QProcess::startDetached("pkexec", QStringList() << "nmcli" << args);
 }
 
 void Backend::aptInstall(const QString &package, const QString &sudoPassword) {

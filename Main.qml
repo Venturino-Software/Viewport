@@ -305,7 +305,7 @@ function executeSmartAction(execString, appName) {
 
             // 2. Limpiá el texto del input para que la próxima vez arranque vacío
             // Cambiá 'idDelInputText' por el ID real de tu TextField de búsqueda
-            idDelInputText.text = ""
+            searchInput.text = ""
 
             // 3. Vaciá el modelo filtrado para borrar los resultados visuales de la RAM
             filteredSearchModel.clear()
@@ -411,29 +411,29 @@ StyledPopup {
         StyledButton {
             text: "⏻  Apagar"
             Layout.minimumHeight: 44 * dpScale
-            buttonColor: "#ff5252"
+            buttonColor: "#d32f2f"
             Layout.fillWidth: true
             onClicked: {
-                AppBackend.openApp("loginctl poweroff")
+                AppBackend.runCommand("pkexec systemctl poweroff") // Crear un runCommand simple
                 powerPopup.close()
             }
         }
         StyledButton {
             text: "↻  Reiniciar"
             Layout.minimumHeight: 44 * dpScale
-            buttonColor: "#ffa726"
+            buttonColor: "#e65100"
             Layout.fillWidth: true
             onClicked: {
-                AppBackend.openApp("loginctl reboot")
+                AppBackend.openApp("pkexec loginctl reboot")
                 powerPopup.close()
             }
         }
         StyledButton {
-            text: "↩  Salir a TTY"
+            text: "🔄  Recargar entorno gráfico"
             Layout.minimumHeight: 44 * dpScale
             Layout.fillWidth: true
             onClicked: {
-                AppBackend.openApp("loginctl terminate-session $XDG_SESSION_ID")
+                AppBackend.runCommand("pkexec pkill -x cage")   // o "killall cage"
                 powerPopup.close()
             }
         }
@@ -443,6 +443,7 @@ StyledPopup {
             buttonColor: "#666666"
             Layout.fillWidth: true
             onClicked: powerPopup.close()
+            animationId: 2
         }
     }
 }
@@ -579,15 +580,19 @@ StyledPopup {
     height: 450 * dpScale
     accentColor: "#4fc3f7"
 
-    ListModel { id: wifiModel }
+    ListModel {
+        id: wifiModel
+        ListElement { ssid: ""; encrypted: false }  // Elemento inicial de plantilla
+    }
 
     onOpened: {
-        var networks = AppBackend.scanWifi()
         wifiModel.clear()
+        var networks = AppBackend.scanWifi()
         for (var i = 0; i < networks.length; i++) {
-            wifiModel.append(networks[i])
+            wifiModel.append({ "ssid": networks[i].ssid, "encrypted": networks[i].encrypted })
         }
     }
+
 
     ColumnLayout {
         anchors.fill: parent
@@ -609,16 +614,16 @@ StyledPopup {
             clip: true
             delegate: ItemDelegate {
                 width: ListView.view.width
-                text: modelData.ssid + (modelData.encrypted ? " 🔒" : "")
+                text: model.ssid + (model.encrypted ? " 🔒" : "")
                 background: Rectangle {
                     color: hovered ? "#2a2a3a" : "transparent"
                     radius: 6
                 }
                 onClicked: {
-                    if (modelData.encrypted) {
-                                        // Pedir contraseña
+                    if (model.encrypted) {
+                        // Pedir contraseña (puedes abrir otro popup para eso)
                     } else {
-                        AppBackend.connectWifi(modelData.ssid, "")
+                        AppBackend.connectWifi(model.ssid, "")
                         wifiPopup.close()
                     }
                 }
@@ -1383,12 +1388,30 @@ function cancelLaunch() {
     cancelAnim.start()
 }
 
-Loader {
-        id: oobeLoader
-        // Se activa automáticamente cuando tu C++ dice que es el primer arranque
-        active: AppBackend.isFirstRun
-        anchors.fill: parent
-        source: "qrc:/vpt01/FirstStart.qml"
-        z: 99999 // Fuerza a que la interfaz de setup tape TODO el escritorio
+Shortcut {
+    sequence: "Ctrl+F12"
+    onActivated: {
+        console.log("Forzando recarga del instalador")
+        oobeLoader.active = false
+        oobeLoader.active = true
+        oobeLoader.source = "FirstStart.qml"
     }
+}
+
+Loader {
+    id: oobeLoader
+    active: AppBackend.isFirstRun  // ← Esto debe ser true
+    anchors.fill: parent
+    source: "FirstStart.qml"       // ← El nombre debe coincidir EXACTAMENTE
+    z: 99999
+
+    onStatusChanged: {
+        if (status === Loader.Ready) {
+            console.log("✅ FirstStart.qml cargado correctamente")
+        } else if (status === Loader.Error) {
+            console.error("❌ No se encuentra FirstStart.qml")
+        }
+    }
+}
+
 }

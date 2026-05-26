@@ -24,6 +24,7 @@
 #include <QLocale>
 #include <QSettings>
 #include <QFileInfo>
+#include <qjsvalue.h>
 
 class Backend : public QObject
 {
@@ -76,6 +77,8 @@ public:
 
     Q_INVOKABLE QString readFile(const QString& path);
     Q_INVOKABLE void writeFile(const QString& path, const QString& content);
+
+    Q_INVOKABLE void runCommandWithSudo(const QString &command, const QString &password, QJSValue callback = QJSValue());
 
 signals:
     void appClosed();
