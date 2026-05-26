@@ -56,6 +56,8 @@ jobs:
           cp nunitor.ttf debian_package/vpt/bin/
           cp changaone.ttf debian_package/vpt/bin/
           cp FirstStart.qml debian_package/vpt/bin/
+          cp CommandPill.qml debian_package/vpt/bin/
+          cp azaretmono.ttf debian_package/vpt/bin/
           
           # Si no hay etiqueta, usamos el número de ejecución
           VERSION="1.0.${{ github.run_number }}"
