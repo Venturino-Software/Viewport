@@ -26,26 +26,26 @@ QtObject {
     // === CARGAR FUENTES ===
     FontLoader {
         id: changaOneLoader
-        source: "changaone.ttf"  // Mejor en subcarpeta
+        source: "fonts/changaone.ttf"  // Mejor en subcarpeta
         onStatusChanged: checkAllFontsReady()
     }
 
     FontLoader {
         id: nunitoLoader
-        source: "nunito.ttf"
+        source: "fonts/nunito.ttf"
         onStatusChanged: checkAllFontsReady()
     }
 
     FontLoader {
         id: interLoader
-        source: "inter.ttf"
+        source: "fonts/inter.ttf"
         onStatusChanged: checkAllFontsReady()
     }
 
     // Fuentes mono opcionales
     FontLoader {
         id: jetbrainsLoader
-        source: "JetBrainsMono-Regular.ttf"
+        source: "fonts/JetBrainsMono-Regular.ttf"
         onStatusChanged: checkAllFontsReady()
     }
 

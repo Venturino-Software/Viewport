@@ -414,8 +414,10 @@ StyledPopup {
             buttonColor: "#d32f2f"
             Layout.fillWidth: true
             onClicked: {
-                AppBackend.runCommand("pkexec systemctl poweroff") // Crear un runCommand simple
-                powerPopup.close()
+                authPopup.commandToRun = "systemctl poweroff"
+                authPopup.description = "Se necesita autenticación para apagar el sistema."
+                authPopup.onSuccess = function() { powerPopup.close() }
+                authPopup.open()
             }
         }
         StyledButton {
@@ -433,7 +435,7 @@ StyledPopup {
             Layout.minimumHeight: 44 * dpScale
             Layout.fillWidth: true
             onClicked: {
-                AppBackend.runCommand("pkexec pkill -x cage")   // o "killall cage"
+                AppBackend.runCommand("pkill -x cage")   // o "killall cage"
                 powerPopup.close()
             }
         }
