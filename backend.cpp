@@ -331,7 +331,7 @@ int Backend::getBrightness() {
 }
 
 void Backend::setBrightness(int val) {
-    QProcess::startDetached("pkexec", QStringList() << "brightnessctl" << "s" << QString::number(val) + "%");
+    QProcess::startDetached("sudo", QStringList() << "brightnessctl" << "s" << QString::number(val) + "%");
 }
 
 void Backend::runCommandWithSudo(const QString &command, const QString &password, QJSValue callback) {
@@ -395,14 +395,14 @@ void Backend::runNS(const QString &args) {
     // o configurar un archivo sudoers para que este script no pida pass
     // Como entiende Soyzian esta funcion:
     // proceso: empezar: pica kulo exec, quality lista de strings, ruta de binario/configuracion de internet
-    process->start("pkexec", QStringList() << "/vpt/adm/bin/netconfig.sh" << args);
+    process->start("sudo", QStringList() << "/vpt/adm/bin/netconfig.sh" << args);
 }
 
 void Backend::connectWifi(const QString &ssid, const QString &password) {
     QStringList args;
     args << "device" << "wifi" << "connect" << ssid;
     if (!password.isEmpty()) args << "password" << password;
-    QProcess::startDetached("pkexec", QStringList() << "nmcli" << args);
+    QProcess::startDetached("sudo", QStringList() << "/usr/bin/nmcli" << args);
 }
 
 void Backend::aptInstall(const QString &package, const QString &sudoPassword) {

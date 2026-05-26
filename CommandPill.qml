@@ -54,10 +54,12 @@ Item {
         let fullCommand = prefix.toLowerCase() + " " + command;
 
         if (prefix === "Sudo") {
-            sudoWarningPopup.pendingCommand = fullCommand;
+            sudoWarningPopup.pendingCommand = "sudo /usr/bin/" + command;
             sudoWarningPopup.open();
         } else if (prefix === "Apt") {
-            runInTerminal("sudo " + fullCommand)
+            runInTerminal("sudo /usr/bin/" + fullCommand)
+        } else if (prefix === "$") {
+            runInTerminal(command);
         } else {
             runInTerminal(fullCommand);
         }
@@ -97,7 +99,7 @@ Item {
             // 1. DROPDOWN (Comandos Base)
             ComboBox {
                 id: prefixCombo
-                model: ["Sudo", "Apt", "sh", "Git"]
+                model: ["$", "Apt", "Sudo", "Sh"]
                 Layout.preferredWidth: 110 * dpScale
                 Layout.fillHeight: true
 

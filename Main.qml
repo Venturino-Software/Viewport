@@ -509,8 +509,6 @@ StyledPopup {
     }
 }
 
-// En tu archivo principal (donde instancies el CommandPill)
-
 StyledPopup {
   id: sudoWarningPopup
   property string pendingCommand: ""
@@ -609,7 +607,7 @@ StyledPopup {
             buttonColor: "#d32f2f"
             Layout.fillWidth: true
             onClicked: {
-                authPopup.commandToRun = "sudo systemctl poweroff"
+                authPopup.commandToRun = "sudo /usr/bin/systemctl poweroff"
                 authPopup.description = "Se necesita autenticación para apagar el sistema."
                 authPopup.onSuccess = function() { powerPopup.close() }
                 authPopup.open()
@@ -621,7 +619,7 @@ StyledPopup {
             buttonColor: "#e65100"
             Layout.fillWidth: true
             onClicked: {
-                AppBackend.openApp("sudo loginctl reboot")
+                AppBackend.openApp("sudo /usr/bin/loginctl reboot")
                 powerPopup.close()
             }
         }
@@ -630,7 +628,7 @@ StyledPopup {
             Layout.minimumHeight: 44 * dpScale
             Layout.fillWidth: true
             onClicked: {
-                AppBackend.runCommand("sudo killall cage")   // o "killall cage"
+                AppBackend.runCommand("sudo /usr/bin/pkill cage")   // o "killall cage"
                 powerPopup.close()
             }
         }
@@ -1659,6 +1657,7 @@ function launchApp(startX, startY, name, execCommand, index, iconName) {
     if (launchAnim.running) return // Evita multi-clic
 
     AppBackend.openApp(execCommand) // <-- Llamada al sistema a través de C++
+    myCommandPill.visible = false
 
     transitionCard.appName = name
     transitionCard.appIcon = iconName
@@ -1680,7 +1679,7 @@ function launchApp(startX, startY, name, execCommand, index, iconName) {
 function cancelLaunch() {
     // Ignora si no está visible o si YA se está cancelando
     if (!transitionCard.visible || cancelAnim.running) return
-
+    myCommandPill.visible = false
     launchAnim.stop()
     cancelAnim.start()
 }
