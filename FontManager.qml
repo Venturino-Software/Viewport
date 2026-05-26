@@ -7,7 +7,7 @@ QtObject {
     // === PROPIEDADES DE FUENTES ACTUALES ===
     property string titleFontFamily: "Changa One"
     property string bodyFontFamily: "Nunito"
-    property string monoFontFamily: "JetBrains Mono"  // Por si querés mono
+    property string monoFontFamily: "Azaret Mono"  // Por si querés mono
 
     // === RUTA DE CONFIGURACIÓN (con fallback) ===
     property string configPath: {
@@ -44,8 +44,8 @@ QtObject {
 
     // Fuentes mono opcionales
     FontLoader {
-        id: jetbrainsLoader
-        source: "fonts/JetBrainsMono-Regular.ttf"
+        id: azaretmono
+        source: "fonts/azaretmono.ttf"
         onStatusChanged: checkAllFontsReady()
     }
 
@@ -75,19 +75,19 @@ QtObject {
             name: "Nunito",
             loader: nunitoLoader,
             category: "body",
-            displayName: "Nunito (Cuerpo)"
+            displayName: "Nunito Regular"
         },
         "inter": {
             name: "Inter",
             loader: interLoader,
             category: "body",
-            displayName: "Inter (Moderna)"
+            displayName: "Inter Regular"
         },
         "jetbrains": {
-            name: "JetBrains Mono",
-            loader: jetbrainsLoader,
+            name: "Azaret Mono",
+            loader: azaretmono,
             category: "mono",
-            displayName: "JetBrains Mono (Código)"
+            displayName: "Azaret Mono Regular"
         }
     })
 

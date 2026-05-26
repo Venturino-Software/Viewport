@@ -386,6 +386,171 @@ StyledPopup {
     }
 }
 
+// En tu archivo principal (donde instancies el CommandPill)
+
+StyledPopup {
+  id: sudoWarningPopup
+  property string pendingCommand: ""
+  width: Math.min(450 * dpScale, parent.width * 0.9)
+  disableDefs: true          // 1. Apaga el centerIn nativo
+  verticalAlignment: "high"  // 2. Le dice que use la posición alta
+  height: 250 * dpScale
+  accentColor: "#ff4d4d" // Rojo para advertencia
+  popupRadius: 16 * dpScale
+
+  ColumnLayout {
+      anchors.fill: parent
+      anchors.margins: 20 * dpScale
+      spacing: 10 * dpScale
+
+      Text {
+          text: "Sudo: Viewport"
+          color: "#ffffff"
+          font.pixelSize: 20 * dpScale
+          font.bold: true
+          Layout.alignment: Qt.AlignHCenter
+      }
+
+      Text {
+          text: "¿Confirmas que quieres hacer esta acción?"
+          color: "#ffffff"
+          font.pixelSize: 16 * dpScale
+          Layout.alignment: Qt.AlignHCenter
+      }
+
+      Text {
+          text: "Te preguntamos esto debido a que viewport tiene permisos infinitos sobre tu sistema, ejecutar comandos peligrosos en viewport puede traer consecuencias graves."
+          color: "#aaaaaa"
+          font.pixelSize: 12 * dpScale
+          wrapMode: Text.WordWrap
+          Layout.fillWidth: true
+          horizontalAlignment: Text.AlignHCenter
+      }
+
+      Item { Layout.fillHeight: true } // Spacer
+
+      RowLayout {
+          Layout.fillWidth: true
+          spacing: 15 * dpScale
+
+          StyledButton {
+              text: "No"
+              Layout.fillWidth: true
+              onClicked: sudoWarningPopup.close()
+          }
+
+          StyledButton {
+              text: "Sí, ejecutar"
+              Layout.fillWidth: true
+              onClicked: {
+                  sudoWarningPopup.close();
+                  rootPill.runInTerminal(sudoWarningPopup.pendingCommand);
+              }
+          }
+      }
+  }
+}
+
+// --- POPUP DE TERMINAL INTERACTIVA ---
+/*
+Mejora del anterior popup de terminal.
+Viendo activamente si reemplazar esto al popup de terminal
+:)
+*/
+StyledPopup {
+  id: terminalPopup2
+  property string command: ""
+  width: Math.min(750 * dpScale, parent.width * 0.95)
+  height: 450 * dpScale
+  disableDefs: true          // 1. Apaga el centerIn nativo
+  verticalAlignment: "high"  // 2. Le dice que use la posición alta
+  accentColor: rootPill.accentColor
+  popupRadius: 12
+
+  onOpened: {
+      outputArea.text = "$ " + command + "\n";
+      // Llama a tu backend real aquí
+      if (typeof AppBackend !== "undefined") {
+          AppBackend.runCommandWithOutput(command);
+      } else {
+          outputArea.append("Simulando ejecución de: " + command + "\n");
+      }
+  }
+
+  ColumnLayout {
+      anchors.fill: parent
+      spacing: 10 * dpScale
+
+      // Cabecera
+      Text {
+          text: "Terminal Embebida"
+          color: "#ffffff"
+          font.pixelSize: 18 * dpScale
+          font.bold: true
+      }
+
+      // Área de salida (Output)
+      ScrollView {
+          Layout.fillWidth: true
+          Layout.fillHeight: true
+          TextArea {
+              id: outputArea2
+              readOnly: true
+              color: "#ccddee"
+              font.family: "monospace" // Idealmente tu Fira Code
+              font.pixelSize: 13 * dpScale
+              background: Rectangle {
+                  color: "#0e0e18"
+                  radius: 8 * dpScale
+                  border.color: "#2a2a3a"
+              }
+              padding: 10 * dpScale
+          }
+      }
+
+      // Input interactivo conectado a la misma terminal
+      RowLayout {
+          Layout.fillWidth: true
+          spacing: 10 * dpScale
+
+          TextField {
+              id: liveTerminalInput
+              Layout.fillWidth: true
+              placeholderText: "Escribe para interactuar con la terminal..."
+              color: "#ffffff"
+              background: Rectangle {
+                  color: "#1a1c2b"
+                  radius: 6 * dpScale
+                  border.color: rootPill.accentColor
+                  border.width: 1 * dpScale
+              }
+              Keys.onReturnPressed: {
+                  if (text.trim() !== "") {
+                      outputArea.append("\n$ " + text);
+                      if (typeof AppBackend !== "undefined") AppBackend.runCommandWithOutput(text);
+                      text = "";
+                  }
+              }
+          }
+
+          StyledButton {
+              text: "Cerrar"
+              Layout.minimumHeight: liveTerminalInput.height
+              onClicked: terminalPopup.close()
+              animationId: 2
+          }
+      }
+  }
+
+  // Conexiones al backend (comentadas/protegidas para evitar errores si no existe)
+  Connections {
+      target: typeof AppBackend !== "undefined" ? AppBackend : null
+      function onCommandOutput(output) {
+          outputArea.append(output);
+      }
+  }
+}
+
 StyledPopup {
     id: powerPopup
     property string action: ""
@@ -414,7 +579,7 @@ StyledPopup {
             buttonColor: "#d32f2f"
             Layout.fillWidth: true
             onClicked: {
-                authPopup.commandToRun = "systemctl poweroff"
+                authPopup.commandToRun = "sudo systemctl poweroff"
                 authPopup.description = "Se necesita autenticación para apagar el sistema."
                 authPopup.onSuccess = function() { powerPopup.close() }
                 authPopup.open()
@@ -426,7 +591,7 @@ StyledPopup {
             buttonColor: "#e65100"
             Layout.fillWidth: true
             onClicked: {
-                AppBackend.openApp("pkexec loginctl reboot")
+                AppBackend.openApp("sudo loginctl reboot")
                 powerPopup.close()
             }
         }
@@ -435,7 +600,7 @@ StyledPopup {
             Layout.minimumHeight: 44 * dpScale
             Layout.fillWidth: true
             onClicked: {
-                AppBackend.runCommand("pkill -x cage")   // o "killall cage"
+                AppBackend.runCommand("sudo killall cage")   // o "killall cage"
                 powerPopup.close()
             }
         }
@@ -518,6 +683,7 @@ StyledPopup {
             Layout.minimumHeight: 44 * dpScale
             Layout.alignment: Qt.AlignHCenter
             onClicked: AppBackend.playTestSound()
+            animationId: 2
         }
     }
 }
@@ -638,6 +804,7 @@ StyledPopup {
             Layout.minimumHeight: 44 * dpScale
             Layout.fillWidth: true
             onClicked: AppBackend.openApp("/vpt/adm/bin/netconfig.sh")
+            animationId: 2
         }
     }
 }
@@ -701,6 +868,7 @@ StyledPopup {
                 Layout.minimumHeight: 44 * dpScale
                 Layout.fillWidth: true
                 onClicked: wifiPasswordPopup.close()
+                animationId: 2
             }
         }
     }
@@ -823,6 +991,7 @@ StyledPopup {
                 text: "Cerrar"
                 Layout.minimumHeight: 44 * dpScale
                 onClicked: aptPopup.close()
+                animationId: 2
             }
         }
     }
@@ -903,12 +1072,14 @@ Item {
                 id: searchClickArea
                 anchors.fill: parent
                 hoverEnabled: true
-                // Al usar onPressed, el buscador salta apenas el dedo toca el vidrio
                 onPressed: {
                     if (searchOverlay.state !== "VISIBLE") {
                         updateSearchFilter("")
                         searchOverlay.state = "VISIBLE"
                         searchInput.forceActiveFocus()
+                    }
+                    if (myCommandPill.visible) {
+                        myCommandPill.visible = false
                     }
                 }
             }
@@ -1507,6 +1678,35 @@ Loader {
         } else if (status === Loader.Error) {
             console.error("❌ No se encuentra FirstStart.qml")
         }
+    }
+}
+
+// En Main.qml, justo antes del último cierre de llave '}'
+CommandPill {
+    id: myCommandPill
+    visible: false
+    z: 100
+    opacity: 0
+    y: 30 * dpScale
+
+    // Asignación de propiedades existentes del componente
+    sudoWarningPopup: sudoWarningPopup
+    terminalPopup: terminalPopup
+    searchOverlayRef: searchOverlay    // Sin "property var" adelante
+}
+// Shortcut para mostrar/ocultar (Ctrl+T o Meta+R)
+Shortcut {
+    sequences: ["Ctrl+T", "Meta+R"]
+    onActivated: {
+        myCommandPill.visible = !myCommandPill.visible
+    }
+}
+
+// Shortcut para ocultar con Escape
+Shortcut {
+    sequences: ["Escape"]
+    onActivated: {
+        myCommandPill.visible = false
     }
 }
 

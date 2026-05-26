@@ -20,6 +20,7 @@ qt_add_qml_module(appvpt01
     QML_FILES FontManager.qml
     QML_FILES DpiScaleManager.qml
     QML_FILES
+    QML_FILES CommandPill.qml
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

@@ -11,6 +11,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import Qt5Compat.GraphicalEffects
+import QtQuick.Window 2.15   // <--- ESTO ES LO QUE FALTA
 
 Popup {
     id: root
@@ -42,11 +43,36 @@ Popup {
     // Control interno para animaciones ambientales
     property bool isOpened: false
 
-    onOpened: isOpened = true
+    property bool disableDefs: false
+    property string verticalAlignment: "center" // "center" o "high"
+
+    onOpened: {
+        isOpened = true
+        console.log("Popup opened. Overlay size:",
+                    root.Overlay.overlay ? root.Overlay.overlay.width : "no overlay",
+                    "Popup pos:", x, y,
+                    "Parent:", parent)
+    }
     onClosed: isOpened = false
 
-    // Centrar automáticamente en la ventana principal
-    anchors.centerIn: parent
+    // Si disableDefs es true, se vuelve null y libera el posicionamiento manual
+    anchors.centerIn: disableDefs ? null : parent
+
+    x: {
+        if (disableDefs && root.Overlay.overlay) {
+            return (root.Overlay.overlay.width - width) / 2
+        }
+        return undefined
+    }
+    y: {
+        if (disableDefs && root.Overlay.overlay) {
+            var baseY = (root.Overlay.overlay.height - height) / 2
+            if (verticalAlignment === "high")
+                baseY -= 120 * dp
+            return baseY
+        }
+        return undefined
+    }
 
     // =================== FONDO Y EFECTOS ===================
     background: Item {
@@ -169,4 +195,5 @@ gradient: Gradient {
             }
         }
     }
+
 }

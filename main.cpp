@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
 {
     qputenv("QT_QPA_PLATFORM", "wayland");
     qputenv("QT_WAYLAND_FORCE_DPI", "physical");
-    qputenv("QT_SCALE_FACTOR", "1.4");
+    qputenv("QT_SCALE_FACTOR", "1.65");
 
     QGuiApplication app(argc, argv);
 
@@ -32,11 +32,7 @@ int main(int argc, char *argv[])
     QIcon::setThemeSearchPaths(iconPaths);
     QIcon::setThemeName("Yaru");
     QIcon::setFallbackThemeName("hicolor");
-
-    // 2. ✅ CREAR Backend ANTES de exponerlo
     Backend appBackend;
-
-    // 3. ✅ Verificar paths necesarios
     QDir vptDir("/vpt");
     if (!vptDir.exists()) {
         qWarning() << "/vpt no existe, creando...";
@@ -44,8 +40,6 @@ int main(int argc, char *argv[])
         QDir().mkpath("/vpt/share/media");
         QDir().mkpath("/vpt/adm/bin");
     }
-
-    // 4. ✅ Verificar archivos requeridos
     QString testWav = "/vpt/etc/sounds/test.wav";
     if (!QFile::exists(testWav)) {
         qWarning() << testWav << "no existe, creando dummy...";
@@ -54,30 +48,21 @@ int main(int argc, char *argv[])
             file.close();
         }
     }
-
     QString videoPath = "/vpt/share/media/helloworld.mp4";
     if (!QFile::exists(videoPath)) {
         qWarning() << videoPath << "no existe!";
         // Crear directorio si no existe
         QDir().mkpath("/vpt/share/media");
     }
-
-    // 5. ✅ Exponer Backend AL CONTEXTO QML
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("AppBackend", &appBackend);
-
-    // 6. ✅ Agregar ImageProvider
     engine.addImageProvider("icon", new IconProvider);
-
-    // 7. ✅ Conexión de errores
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,
         &app,
         []() { QCoreApplication::exit(-1); },
         Qt::QueuedConnection);
-
-    // 8. ✅ Cargar QML
     engine.load(QUrl::fromLocalFile("Main.qml"));
 
     if (engine.rootObjects().isEmpty()) {
