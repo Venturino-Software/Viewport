@@ -584,7 +584,7 @@ StyledPopup {
 
     ListModel {
         id: wifiModel
-        ListElement { ssid: ""; encrypted: false }  // Elemento inicial de plantilla
+        ListElement { ssid: ""; encrypted: false }
     }
 
     onOpened: {
@@ -594,7 +594,6 @@ StyledPopup {
             wifiModel.append({ "ssid": networks[i].ssid, "encrypted": networks[i].encrypted })
         }
     }
-
 
     ColumnLayout {
         anchors.fill: parent
@@ -623,7 +622,9 @@ StyledPopup {
                 }
                 onClicked: {
                     if (model.encrypted) {
-                        // Pedir contraseña (puedes abrir otro popup para eso)
+                        // Abrir popup de contraseña
+                        wifiPasswordPopup.ssid = model.ssid
+                        wifiPasswordPopup.open()
                     } else {
                         AppBackend.connectWifi(model.ssid, "")
                         wifiPopup.close()
@@ -639,6 +640,98 @@ StyledPopup {
             onClicked: AppBackend.openApp("/vpt/adm/bin/netconfig.sh")
         }
     }
+}
+
+// Popup para pedir contraseña de red WiFi encriptada
+StyledPopup {
+    id: wifiPasswordPopup
+    property string ssid: ""
+    width: 400 * dpScale
+    height: 280 * dpScale
+    accentColor: "#4fc3f7"
+    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 15 * dpScale
+
+        Text {
+            text: "Contraseña para: " + wifiPasswordPopup.ssid
+            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ?
+                FontManager.titleFontFamily : "DejaVu Sans"
+            font.pixelSize: 16 * dpScale
+            color: "#ffffff"
+            font.bold: true
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+        }
+
+        TextField {
+            id: wifiPasswordField
+            echoMode: TextInput.Password
+            placeholderText: "Contraseña de la red"
+            Layout.fillWidth: true
+            background: Rectangle {
+                radius: 8
+                color: "#1e1e2e"
+                border.color: "#4fc3f7"
+            }
+            color: "#ffffff"
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 10 * dpScale
+
+            StyledButton {
+                text: "Conectar"
+                Layout.minimumHeight: 44 * dpScale
+                Layout.fillWidth: true
+                buttonColor: "#4fc3f7"
+                onClicked: {
+                    if (wifiPasswordField.text === "") return
+                    AppBackend.connectWifi(wifiPasswordPopup.ssid, wifiPasswordField.text)
+                    wifiPasswordPopup.close()
+                    wifiPopup.close()
+                }
+            }
+
+            StyledButton {
+                text: "Cancelar"
+                Layout.minimumHeight: 44 * dpScale
+                Layout.fillWidth: true
+                onClicked: wifiPasswordPopup.close()
+            }
+        }
+    }
+
+    onClosed: {
+        wifiPasswordField.text = "" // limpiar contraseña al cerrar
+    }
+}
+
+function reloadApps() {
+    console.log("[vpt|FORCE] loading apps")
+    var systemApps = AppBackend.loadDesktopApps()
+    console.log("[vpt] apps: " + systemApps.length)
+
+    // Limpiar modelos existentes
+    baseSearchModel.clear()
+    appModel.clear()
+
+    for (var i = 0; i < systemApps.length; i++) {
+        var appData = systemApps[i]
+        console.log("[vpt] app [" + i + "]: " + appData.name + " -> " + appData.exec)
+
+        // Agregar a la base de búsqueda
+        baseSearchModel.append(appData)
+
+        // Agregar las primeras 8 apps al grid principal (o todas, según tu lógica)
+        if (i < systemApps.length) {   // <-- nota: esto siempre es true, quiza querías i < 8 ?
+            appModel.append(appData)
+        }
+    }
+    updateSearchFilter("") // Inicializa la lista del buscador
 }
 
 StyledPopup {
@@ -742,6 +835,7 @@ StyledPopup {
         }
         function onAptFinished(success) {
             aptLog.append(success ? "Instalación completada." : "Error en la instalación.")
+            reloadApps()
             progressBar.visible = false
         }
     }
