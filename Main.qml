@@ -323,65 +323,188 @@ function hideAllPopups() {
 StyledPopup {
     id: terminalPopup
     property string command: ""
-    width: Math.min(700 * dpScale, root.width * 0.9)
-    height: 400 * dpScale
-    accentColor: "#00e676"
-    popupRadius: 12
 
-    fontType: "body"  // El popup usa bodyFont
+    width: Math.min(800 * dpScale, parent ? parent.width * 0.95 : 800)
+    height: 550 * dpScale
+    accentColor: "#00e676"
+    popupRadius: 16 * dpScale // Radio de bordes más redondeado (estilo popup 2)
+    fontType: "body"
+
+    // Comentar o descomentar si necesitas centrado manual
+    // disableDefs: true
 
     onOpened: {
         outputArea.text = "Ejecutando: " + command + "\n"
-        AppBackend.runCommandWithOutput(command)
+        progressBar.value = 0
+        progressBar.visible = false
+        if (command !== "") {
+            AppBackend.runCommandWithOutput(command)
+        }
     }
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: 15 * dpScale
+        anchors.margins: 20 * dpScale
+        spacing: 12 * dpScale
 
-        // Cabecera
+        // --- CABECERA ---
         Text {
-            text: "Resultado del comando"
+            text: "Terminal de Viewport"
             font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ?
-                FontManager.titleFontFamily : "DejaVu Sans"
+                         FontManager.titleFontFamily : "DejaVu Sans"
             font.pixelSize: 18 * dpScale
             color: "#ffffff"
             font.bold: true
+            Layout.alignment: Qt.AlignHCenter
         }
 
-        // Área de salida
+        // --- ÁREA DE SALIDA (OUTPUT) ---
         ScrollView {
+            id: scrollArea
             Layout.fillWidth: true
             Layout.fillHeight: true
+            clip: true
+
             TextArea {
                 id: outputArea
                 readOnly: true
                 color: "#ccddee"
                 font.family: typeof FontManager !== "undefined" && FontManager.monoFontFamily ?
-                                    FontManager.monoFontFamily : "Fira Code, monospace"
+                             FontManager.monoFontFamily : "Fira Code, monospace"
                 font.pixelSize: 13 * dpScale
+                wrapMode: Text.WrapAnywhere
+
                 background: Rectangle {
                     color: "#0e0e18"
-                    radius: 8
+                    radius: 8 * dpScale
                     border.color: "#2a2a3a"
                 }
-                padding: 10
+                padding: 12 * dpScale
             }
         }
 
-        // Botón estilizado
-        StyledButton {
-            text: "Cerrar"
-            Layout.minimumHeight: 44 * dpScale
-            Layout.alignment: Qt.AlignRight
-            onClicked: terminalPopup.close()
+        // --- BARRA DE PROGRESO (APT / PIP) ---
+        ProgressBar {
+            id: progressBar
+            Layout.fillWidth: true
+            height: 6 * dpScale
+            visible: false // Se oculta si no hay progreso detectado
+            value: 0.0
+
+            background: Rectangle {
+                color: "#1e1e2e"
+                radius: 3 * dpScale
+            }
+            contentItem: Item {
+                Rectangle {
+                    width: progressBar.visualPosition * parent.width
+                    height: parent.height
+                    radius: 3 * dpScale
+                    color: terminalPopup.accentColor
+
+                    // Animación suave al actualizar porcentaje
+                    Behavior on width { NumberAnimation { duration: 150 } }
+                }
+            }
+        }
+
+        // --- INPUT DE COMANDOS MANUALES ---
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 10 * dpScale
+
+            TextField {
+                id: cmdInput
+                Layout.fillWidth: true
+                placeholderText: "Escribe un comando aquí..."
+                color: "#ffffff"
+                font.family: outputArea.font.family
+                font.pixelSize: 13 * dpScale
+                padding: 10 * dpScale
+
+                background: Rectangle {
+                    color: "#1e1e2e"
+                    radius: 8 * dpScale
+                    border.color: cmdInput.activeFocus ? terminalPopup.accentColor : "#333344"
+                }
+
+                // Ejecutar con la tecla Enter
+                onAccepted: runManualCommand()
+            }
+
+            StyledButton {
+                text: "Ejecutar"
+                Layout.minimumHeight: cmdInput.height
+                onClicked: runManualCommand()
+            }
+        }
+
+        // --- FOOTER: WARNING Y BOTÓN CERRAR ---
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.topMargin: 8 * dpScale
+            spacing: 12 * dpScale // Espaciado directo, sin anidar RowLayouts
+
+            Text {
+                text: "⚠️"
+                font.pixelSize: 18 * dpScale
+                Layout.alignment: Qt.AlignVCenter
+            }
+
+            Text {
+                text: "Viewport tiene permisos infinitos. Use SUDO con cuidado."
+                color: "#ffaa00"
+                font.pixelSize: 12 * dpScale
+                font.bold: true
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignVCenter
+            }
+
+            StyledButton {
+                text: "Cerrar"
+                Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                Layout.minimumHeight: 40 * dpScale
+                Layout.preferredWidth: 100 * dpScale
+                onClicked: terminalPopup.close()
+            }
         }
     }
 
+    // --- CONEXIONES AL BACKEND ---
     Connections {
         target: AppBackend
         function onCommandOutput(output) {
+            // 1. Añadir el texto a la terminal
             outputArea.append(output)
+
+            // 2. FORZAR SCROLL ABAJO SIEMPRE
+            outputArea.cursorPosition = outputArea.length
+
+            // 3. CAPTURAR PROGRESO CON REGEX
+            var match = output.match(/(\d{1,3})\s*%/);
+            if (match && match[1]) {
+                var percent = parseInt(match[1]);
+                if (percent >= 0 && percent <= 100) {
+                    progressBar.visible = true;
+                    progressBar.value = percent / 100.0;
+                }
+            }
+        }
+    }
+
+    // Función para manejar el TextField
+    function runManualCommand() {
+        var newCmd = cmdInput.text.trim();
+        if (newCmd !== "") {
+            outputArea.append("\n$ " + newCmd);
+            outputArea.cursorPosition = outputArea.length;
+
+            AppBackend.runCommandWithOutput(newCmd);
+
+            cmdInput.text = "";
+            progressBar.value = 0.0;
+            progressBar.visible = false;
         }
     }
 }
@@ -393,7 +516,7 @@ StyledPopup {
   property string pendingCommand: ""
   width: Math.min(450 * dpScale, parent.width * 0.9)
   disableDefs: true          // 1. Apaga el centerIn nativo
-  verticalAlignment: "high"  // 2. Le dice que use la posición alta
+// 2. Le dice que use la posición alta
   height: 250 * dpScale
   accentColor: "#ff4d4d" // Rojo para advertencia
   popupRadius: 16 * dpScale
@@ -444,7 +567,7 @@ StyledPopup {
               Layout.fillWidth: true
               onClicked: {
                   sudoWarningPopup.close();
-                  rootPill.runInTerminal(sudoWarningPopup.pendingCommand);
+                  myCommandPill.runInTerminal(sudoWarningPopup.pendingCommand);
               }
           }
       }
@@ -457,99 +580,6 @@ Mejora del anterior popup de terminal.
 Viendo activamente si reemplazar esto al popup de terminal
 :)
 */
-StyledPopup {
-  id: terminalPopup2
-  property string command: ""
-  width: Math.min(750 * dpScale, parent.width * 0.95)
-  height: 450 * dpScale
-  disableDefs: true          // 1. Apaga el centerIn nativo
-  verticalAlignment: "high"  // 2. Le dice que use la posición alta
-  accentColor: rootPill.accentColor
-  popupRadius: 12
-
-  onOpened: {
-      outputArea.text = "$ " + command + "\n";
-      // Llama a tu backend real aquí
-      if (typeof AppBackend !== "undefined") {
-          AppBackend.runCommandWithOutput(command);
-      } else {
-          outputArea.append("Simulando ejecución de: " + command + "\n");
-      }
-  }
-
-  ColumnLayout {
-      anchors.fill: parent
-      spacing: 10 * dpScale
-
-      // Cabecera
-      Text {
-          text: "Terminal Embebida"
-          color: "#ffffff"
-          font.pixelSize: 18 * dpScale
-          font.bold: true
-      }
-
-      // Área de salida (Output)
-      ScrollView {
-          Layout.fillWidth: true
-          Layout.fillHeight: true
-          TextArea {
-              id: outputArea2
-              readOnly: true
-              color: "#ccddee"
-              font.family: "monospace" // Idealmente tu Fira Code
-              font.pixelSize: 13 * dpScale
-              background: Rectangle {
-                  color: "#0e0e18"
-                  radius: 8 * dpScale
-                  border.color: "#2a2a3a"
-              }
-              padding: 10 * dpScale
-          }
-      }
-
-      // Input interactivo conectado a la misma terminal
-      RowLayout {
-          Layout.fillWidth: true
-          spacing: 10 * dpScale
-
-          TextField {
-              id: liveTerminalInput
-              Layout.fillWidth: true
-              placeholderText: "Escribe para interactuar con la terminal..."
-              color: "#ffffff"
-              background: Rectangle {
-                  color: "#1a1c2b"
-                  radius: 6 * dpScale
-                  border.color: rootPill.accentColor
-                  border.width: 1 * dpScale
-              }
-              Keys.onReturnPressed: {
-                  if (text.trim() !== "") {
-                      outputArea.append("\n$ " + text);
-                      if (typeof AppBackend !== "undefined") AppBackend.runCommandWithOutput(text);
-                      text = "";
-                  }
-              }
-          }
-
-          StyledButton {
-              text: "Cerrar"
-              Layout.minimumHeight: liveTerminalInput.height
-              onClicked: terminalPopup.close()
-              animationId: 2
-          }
-      }
-  }
-
-  // Conexiones al backend (comentadas/protegidas para evitar errores si no existe)
-  Connections {
-      target: typeof AppBackend !== "undefined" ? AppBackend : null
-      function onCommandOutput(output) {
-          outputArea.append(output);
-      }
-  }
-}
 
 StyledPopup {
     id: powerPopup
@@ -937,7 +967,7 @@ StyledPopup {
         }
 
         ProgressBar {
-            id: progressBar
+            id: progressBar2
             from: 0; to: 100
             value: 0
             Layout.fillWidth: true
