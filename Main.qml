@@ -540,6 +540,15 @@ StyledPopup {
       }
 
       Text {
+          text: "Comando: \"" + sudoWarningPopup.pendingCommand + "\""
+          color: "#aaaaaa"
+          font.pixelSize: 12 * dpScale
+          wrapMode: Text.WordWrap
+          Layout.fillWidth: true
+          horizontalAlignment: Text.AlignHCenter
+      }
+
+      Text {
           text: "Te preguntamos esto debido a que viewport tiene permisos infinitos sobre tu sistema, ejecutar comandos peligrosos en viewport puede traer consecuencias graves."
           color: "#aaaaaa"
           font.pixelSize: 12 * dpScale
@@ -572,12 +581,71 @@ StyledPopup {
   }
 }
 
-// --- POPUP DE TERMINAL INTERACTIVA ---
-/*
-Mejora del anterior popup de terminal.
-Viendo activamente si reemplazar esto al popup de terminal
-:)
-*/
+
+StyledPopup {
+  id: powerWarn
+  property string pendingCommand: ""
+  width: Math.min(450 * dpScale, parent.width * 0.9)
+  disableDefs: false       // 1. Apaga el centerIn nativo
+// 2. Le dice que use la posición alta
+  height: 250 * dpScale
+  accentColor: "#ff4d4d" // Rojo para advertencia
+  popupRadius: 16 * dpScale
+
+  ColumnLayout {
+      anchors.fill: parent
+      anchors.margins: 20 * dpScale
+      spacing: 10 * dpScale
+
+      Text {
+          text: "Viewport"
+          color: "#ffffff"
+          font.pixelSize: 20 * dpScale
+          font.bold: true
+          Layout.alignment: Qt.AlignHCenter
+      }
+
+      Text {
+          text: "¿Confirmas que quieres hacer esta acción?"
+          color: "#ffffff"
+          font.pixelSize: 16 * dpScale
+          Layout.alignment: Qt.AlignHCenter
+      }
+
+      Text {
+          text: "Te preguntamos esto para prevenir toques accidentales"
+          color: "#aaaaaa"
+          font.pixelSize: 12 * dpScale
+          wrapMode: Text.WordWrap
+          Layout.fillWidth: true
+          horizontalAlignment: Text.AlignHCenter
+      }
+
+      Item { Layout.fillHeight: true } // Spacer
+
+      RowLayout {
+          Layout.fillWidth: true
+          spacing: 15 * dpScale
+
+          StyledButton {
+              text: "No"
+              Layout.fillWidth: true
+              onClicked: powerWarn.close()
+          }
+
+          StyledButton {
+              text: "Sí, ejecutar"
+              Layout.fillWidth: true
+              onClicked: {
+                  powerWarn.close();
+                  myCommandPill.runInTerminal(powerWarn.pendingCommand);
+              }
+          }
+      }
+  }
+}
+
+// --
 
 StyledPopup {
     id: powerPopup
@@ -594,7 +662,7 @@ StyledPopup {
         Text {
             text: "Opciones de energía"
             font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ?
-                FontManager.titleFontFamily : "DejaVu Sans"
+            FontManager.titleFontFamily : "DejaVu Sans"
             font.pixelSize: 18 * dpScale
             color: "#ffffff"
             font.bold: true
@@ -607,10 +675,8 @@ StyledPopup {
             buttonColor: "#d32f2f"
             Layout.fillWidth: true
             onClicked: {
-                authPopup.commandToRun = "/usr/bin/pkexec /usr/bin/systemctl poweroff"
-                authPopup.description = "Se necesita autenticación para apagar el sistema."
-                authPopup.onSuccess = function() { powerPopup.close() }
-                authPopup.open()
+                powerWarn.pendingCommand = "/user/bin/pkexec /usr/bin/systemctl poweroff"
+                powerWarn.open()
             }
         }
         StyledButton {
@@ -619,8 +685,8 @@ StyledPopup {
             buttonColor: "#e65100"
             Layout.fillWidth: true
             onClicked: {
-                AppBackend.openApp("/usr/bin/pkexec /usr/bin/loginctl reboot")
-                powerPopup.close()
+                powerWarn.pendingCommand = "/usr/bin/pkexec /usr/bin/systemctl reboot"
+                powerWarn.open()
             }
         }
         StyledButton {
@@ -628,8 +694,8 @@ StyledPopup {
             Layout.minimumHeight: 44 * dpScale
             Layout.fillWidth: true
             onClicked: {
-                AppBackend.runCommand("/usr/bin/pkexec /usr/bin/pkill cage")   // o "killall cage"
-                powerPopup.close()
+                powerWarn.pendingCommand = "/usr/bin/pkexec /usr/bin/pkill -9 cage"
+                powerWarn.open()
             }
         }
         StyledButton {
