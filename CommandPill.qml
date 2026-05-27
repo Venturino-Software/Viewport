@@ -54,14 +54,14 @@ Item {
         let fullCommand = prefix.toLowerCase() + " " + command;
 
         if (prefix === "Sudo") {
-            sudoWarningPopup.pendingCommand = "sudo /usr/bin/" + command;
+            sudoWarningPopup.pendingCommand = "/usr/bin/sudo /usr/bin/" + command;
             sudoWarningPopup.open();
         } else if (prefix === "Apt") {
-            runInTerminal("sudo /usr/bin/" + fullCommand)
+            runInTerminal("/usr/bin/sudo /usr/bin/" + fullCommand)
         } else if (prefix === "$") {
             runInTerminal(command);
         } else {
-            runInTerminal(fullCommand);
+            runInTerminal("/usr/bin/" + fullCommand);
         }
     }
 

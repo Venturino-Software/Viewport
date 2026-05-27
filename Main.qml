@@ -429,7 +429,7 @@ StyledPopup {
                 }
 
                 // Ejecutar con la tecla Enter
-                onAccepted: runManualCommand()
+                onAccepted: AppBackend.runCommandWithOutput(cmdInput.text)
             }
 
             StyledButton {
