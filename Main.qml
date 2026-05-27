@@ -607,7 +607,7 @@ StyledPopup {
             buttonColor: "#d32f2f"
             Layout.fillWidth: true
             onClicked: {
-                authPopup.commandToRun = "sudo /usr/bin/systemctl poweroff"
+                authPopup.commandToRun = "/usr/bin/pkexec /usr/bin/systemctl poweroff"
                 authPopup.description = "Se necesita autenticación para apagar el sistema."
                 authPopup.onSuccess = function() { powerPopup.close() }
                 authPopup.open()
@@ -619,7 +619,7 @@ StyledPopup {
             buttonColor: "#e65100"
             Layout.fillWidth: true
             onClicked: {
-                AppBackend.openApp("sudo /usr/bin/loginctl reboot")
+                AppBackend.openApp("/usr/bin/pkexec /usr/bin/loginctl reboot")
                 powerPopup.close()
             }
         }
@@ -628,7 +628,7 @@ StyledPopup {
             Layout.minimumHeight: 44 * dpScale
             Layout.fillWidth: true
             onClicked: {
-                AppBackend.runCommand("sudo /usr/bin/pkill cage")   // o "killall cage"
+                AppBackend.runCommand("/usr/bin/pkexec /usr/bin/pkill cage")   // o "killall cage"
                 powerPopup.close()
             }
         }

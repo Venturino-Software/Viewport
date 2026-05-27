@@ -11,7 +11,7 @@ Item {
     property color accentColor: "#7f99ff"
     property real dpScale: typeof globalDpScale !== "undefined" ? globalDpScale : 1.0
 
-    property StyledPopup sudoWarningPopup: null
+    property StyledPopup WarningPopup: null
     property StyledPopup terminalPopup: null
     property var searchOverlayRef: null
 
@@ -54,10 +54,10 @@ Item {
         let fullCommand = prefix.toLowerCase() + " " + command;
 
         if (prefix === "Sudo") {
-            sudoWarningPopup.pendingCommand = "/usr/bin/sudo /usr/bin/" + command;
+            sudoWarningPopup.pendingCommand = "/usr/bin/pkexec /usr/bin/" + command;
             sudoWarningPopup.open();
         } else if (prefix === "Apt") {
-            runInTerminal("/usr/bin/sudo /usr/bin/" + fullCommand)
+            runInTerminal("/usr/bin/pkexec /usr/bin/" + fullCommand)
         } else if (prefix === "$") {
             runInTerminal(command);
         } else {
