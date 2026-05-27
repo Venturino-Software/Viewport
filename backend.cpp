@@ -331,12 +331,12 @@ int Backend::getBrightness() {
 }
 
 void Backend::setBrightness(int val) {
-    QProcess::startDetached("sudo", QStringList() << "brightnessctl" << "s" << QString::number(val) + "%");
+    QProcess::startDetached("/usr/bin/pkexec", QStringList() << "brightnessctl" << "s" << QString::number(val) + "%");
 }
 
 void Backend::runCommandWithSudo(const QString &command, const QString &password, QJSValue callback) {
     QProcess *proc = new QProcess(this);
-    proc->start("sudo", QStringList() << "-S" << "-p" << "" << "sh" << "-c" << command);
+    proc->start("/usr/bin/pkexec", QStringList() << "-S" << "-p" << "" << "sh" << "-c" << command);
     proc->write(password.toUtf8() + "\n");
     proc->closeWriteChannel();
 
@@ -361,7 +361,10 @@ void Backend::runCommandWithSudo(const QString &command, const QString &password
 QVariantList Backend::scanWifi() {
     QVariantList list;
     QProcess p;
-    p.start("nmcli", {"-t", "-f", "SSID,SECURITY", "device", "wifi", "list"});
+    p.start("nmcli", {"device", "wifi", "rescan"});
+    p.waitForFinished(2000);
+    // luego el listado
+    p.start("pkexec", {"/usr/bin/nmcli", "-t", "-f", "SSID,SECURITY", "device", "wifi", "list"});
     p.waitForFinished(5000);
     if (p.exitCode() != 0) {
         qWarning() << "nmcli error:" << p.readAllStandardError();
@@ -395,14 +398,14 @@ void Backend::runNS(const QString &args) {
     // o configurar un archivo sudoers para que este script no pida pass
     // Como entiende Soyzian esta funcion:
     // proceso: empezar: pica kulo exec, quality lista de strings, ruta de binario/configuracion de internet
-    process->start("sudo", QStringList() << "/vpt/adm/bin/netconfig.sh" << args);
+    process->start("/usr/bin/pkexec", QStringList() << "/vpt/adm/bin/netconfig.sh" << args);
 }
 
 void Backend::connectWifi(const QString &ssid, const QString &password) {
     QStringList args;
     args << "device" << "wifi" << "connect" << ssid;
     if (!password.isEmpty()) args << "password" << password;
-    QProcess::startDetached("sudo", QStringList() << "/usr/bin/nmcli" << args);
+    QProcess::startDetached("/usr/bin/pkexec", QStringList() << "/usr/bin/nmcli" << args);
 }
 
 void Backend::aptInstall(const QString &package, const QString &sudoPassword) {

@@ -11,7 +11,7 @@ Item {
     property color accentColor: "#7f99ff"
     property real dpScale: typeof globalDpScale !== "undefined" ? globalDpScale : 1.0
 
-    property StyledPopup WarningPopup: null
+    property StyledPopup sudoWarningPopup: null
     property StyledPopup terminalPopup: null
     property var searchOverlayRef: null
 
