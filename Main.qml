@@ -30,36 +30,13 @@ function forceOobeRestart() {
         oobeLoader.source = "qrc:/vpt01/FirstStart.qml"
     }
 
-// --- SISTEMA DE ESCALADO DINÁMICO (ZOOM) ---
+// --- SISTEMA DE ESCALADO DINÁMICO (fZOOM) ---
 property real zoomFactor: 1.0
 property real baseDpScale: Math.max(1.0, Screen.pixelDensity / 96.0)
 property real dpScale: baseDpScale * zoomFactor // Ahora es dinámico, ¡escala toda la UI junta!
 
 // Variable global para trackear la posición
 property point mousePos: Qt.point(0, 0)
-
-MediaPlayer {
-        id: sndPop
-        source: "qrc:/audio/src/pop.wav"
-audioOutput: AudioOutput {}
-}
-
-MediaPlayer {
-        id: sndSubtle
-        source: "qrc:/audio/src/subt-ui.wav"
-audioOutput: AudioOutput {}
-}
-MediaPlayer {
-        id: sndDetail
-        source: "qrc:/audio/src/detail.wav"
-audioOutput: AudioOutput {}
-}
-
-MediaPlayer {
-        id: sndCritical
-        source: "qrc:/audio/src/critical.wav"
-audioOutput: AudioOutput {}
-}
 
 Shortcut {
     sequence: "Ctrl++"
@@ -826,7 +803,6 @@ StyledPopup {
   height: 250 * dpScale
   accentColor: "#ff4d4d" // Rojo para advertencia
   popupRadius: 16 * dpScale
-  onOpened: AppBackend.playSound("critical.wav")
   ColumnLayout {
       anchors.fill: parent
       anchors.margins: 20 * dpScale
@@ -875,11 +851,13 @@ StyledPopup {
               text: "No"
               Layout.fillWidth: true
               onClicked: sudoWarningPopup.close()
+              animationId: 2
           }
 
           StyledButton {
               text: "Sí, ejecutar"
               Layout.fillWidth: true
+              buttonColor: "#ff4d4d"
               onClicked: {
                   sudoWarningPopup.close();
                   myCommandPill.runInTerminal(sudoWarningPopup.pendingCommand);
@@ -1071,10 +1049,10 @@ StyledPopup {
             pendingPackagesList = pkgList
             if (count > 0) {
                 showUpdateAvailablePopup(count, pkgList)
-                AppBackend.playSound("subt-ui.wav")
+                AppBackend.playSound("detail.wav")
             } else {
                 showInfoPopup("El sistema está actualizado ✓", 2000)
-                sndSubtle.play()
+                AppBackend.playSound("subt-ui.wav")
             }
             // Desconectar esta conexión después de usarla
             AppBackend.updatesAvailable.disconnect(updatesConn)
@@ -1312,7 +1290,7 @@ StyledPopup {
                     if (updateManager.selectedChannel === "desconocido") return "DESCONOCIDO"
                     return updateManager.selectedChannel.toUpperCase()
                 }
-                color: if (updateManager.selectedChannel == "unstable") return "#e67e22"; else if (updateManager.selectedChannel == "stable") return "#2ecc71"; else return "#aaaaaa"
+                color: updateManager.accentColor
                 font.bold: true
                 font.pixelSize: 14 * dpScale
             }
@@ -1365,7 +1343,7 @@ StyledPopup {
             spacing: 15 * dpScale
             StyledButton {
                 text: "Buscar actualizaciones"
-                buttonColor: updateManager.accentColor
+                buttonColor: if (updateManager.selectedChannel == "unstable") return "#e67e22"; else if (updateManager.selectedChannel == "stable") return "#2ecc71"; else return "#aaaaaa"
                 Layout.fillWidth: true
                 onClicked: updateManager.checkForUpdates()
             }
@@ -1393,7 +1371,6 @@ StyledPopup {
   height: 250 * dpScale
   accentColor: "#ff4d4d" // Rojo para advertencia
   popupRadius: 16 * dpScale
-  onOpened: AppBackend.playSound("critical.wav")
   ColumnLayout {
       anchors.fill: parent
       anchors.margins: 20 * dpScale
@@ -1578,7 +1555,7 @@ StyledPopup {
             text: "Probar sonido"
             Layout.minimumHeight: 44 * dpScale
             Layout.alignment: Qt.AlignHCenter
-            onClicked: AppBackend.playTestSound()
+            onClicked: AppBackend.playSound("pop.wav")
             animationId: 2
         }
     }

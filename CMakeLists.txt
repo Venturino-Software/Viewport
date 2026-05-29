@@ -19,10 +19,7 @@ qt_add_qml_module(appvpt01
     SOURCES iconprovider.h
     QML_FILES FontManager.qml
     QML_FILES DpiScaleManager.qml
-    QML_FILES
     QML_FILES CommandPill.qml
-    RESOURCES build/Desktop_Qt_6_11_1-Release/StyledNotification.qrc
-    QML_FILES
     RESOURCES mainrc.qrc
 )
 
@@ -38,6 +35,7 @@ set_target_properties(appvpt01 PROPERTIES
 )
 
 target_link_libraries(appvpt01
+    PRIVATE asound
     PRIVATE Qt6::Quick
 )
 

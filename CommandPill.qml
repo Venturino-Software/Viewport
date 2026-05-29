@@ -15,6 +15,7 @@ Item {
     property StyledPopup terminalPopup: null
     property var searchOverlayRef: null
 
+
     // Posicionamiento ideal (Abajo en el centro)
     anchors.bottom: parent.bottom
     anchors.horizontalCenter: parent.horizontalCenter
@@ -55,10 +56,13 @@ Item {
 
         if (prefix === "Sudo") {
             sudoWarningPopup.pendingCommand = "/usr/bin/pkexec /usr/bin/" + command;
+            AppBackend.playSound("critical.wav")
             sudoWarningPopup.open();
         } else if (prefix === "Apt") {
+            AppBackend.playSound("detail.wav")
             runInTerminal("/usr/bin/pkexec /usr/bin/" + fullCommand)
         } else if (prefix === "$") {
+            AppBackend.playSound("subt-ui.wav")
             runInTerminal(command);
         } else {
             runInTerminal("/usr/bin/" + fullCommand);
@@ -119,6 +123,7 @@ Item {
 
                 // Personalización para que se abra HACIA ARRIBA y con bordes redondeados
                 popup: Popup {
+                    clip: true
                     y: -height - (10 * dpScale) // Abre hacia arriba, con un margen de 10
                     width: prefixCombo.width
                     implicitHeight: contentItem.implicitHeight
@@ -137,15 +142,14 @@ Item {
                         radius: 16 * dpScale // Pill style dropdown
                         border.color: rootPill.accentColor
                         border.width: 1 * dpScale
-
-                        DropShadow {
-                            anchors.fill: parent
-                            source: parent
-                            color: "#80000000"
-                            radius: 10
-                            samples: 21
-                        }
                     }
+                }
+                DropShadow {
+                    anchors.fill: parent
+                    source: parent
+                    color: "#80000000"
+                    radius: 10
+                    samples: 21
                 }
 
                 delegate: ItemDelegate {

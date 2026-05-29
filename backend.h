@@ -25,6 +25,8 @@
 #include <QSettings>
 #include <QFileInfo>
 #include <qjsvalue.h>
+#include <QtConcurrent/QtConcurrent>
+#include <alsa/asoundlib.h>
 
 class Backend : public QObject
 {
@@ -82,12 +84,93 @@ public:
 
     Q_INVOKABLE void runPkexec(const QString &command);
     Q_INVOKABLE void checkForUpdates(); // combina apt update + análisis
+    Q_INVOKABLE void playSound(const QString &fileName)
+    {
+        // Capturamos la ruta completa y delegamos a un hilo secundario
+        QString fullPath = "/vpt/bin/src/" + fileName;
+        QThreadPool::globalInstance()->start([this, fullPath]() {
+            // --- Aquí va toda la lógica de reproducción (bloqueante) ---
+            QFile file(fullPath);
+            if (!file.open(QIODevice::ReadOnly)) {
+                qDebug() << "[ALSA] No se pudo abrir el archivo:" << fullPath;
+                return;
+            }
 
-    Q_INVOKABLE void playSound(const QString &source) {
-        QString res = "/vpt/bin/src/" + source;
-        QProcess::startDetached("aplay", {res});
+            QByteArray rawData = file.readAll();
+            file.close();
+
+            if (rawData.size() < 44) {
+                qDebug() << "[ALSA] Archivo demasiado pequeño para WAV";
+                return;
+            }
+
+            // Validar cabecera RIFF y WAVE
+            if (rawData.mid(0, 4) != "RIFF" || rawData.mid(8, 4) != "WAVE") {
+                qDebug() << "[ALSA] No es un WAV válido (cabecera incorrecta)";
+                return;
+            }
+
+            // Buscar el chunk 'data'
+            int dataOffset = -1;
+            quint32 dataSize = 0;
+            int pos = 12;
+            while (pos + 8 <= rawData.size()) {
+                QByteArray chunkId = rawData.mid(pos, 4);
+                quint32 chunkSize = *reinterpret_cast<const quint32*>(rawData.constData() + pos + 4);
+                if (chunkId == "data") {
+                    dataOffset = pos + 8;
+                    dataSize = chunkSize;
+                    break;
+                }
+                pos += 8 + chunkSize;
+            }
+
+            if (dataOffset == -1 || dataOffset + dataSize > rawData.size()) {
+                qDebug() << "[ALSA] No se encontró el chunk 'data'";
+                return;
+            }
+
+            QByteArray pcmData = rawData.mid(dataOffset, dataSize);
+            const int bytesPerFrame = 4; // estéreo 16-bit
+            if (pcmData.size() % bytesPerFrame != 0) {
+                qDebug() << "[ALSA] Datos PCM no múltiplo de" << bytesPerFrame << "bytes";
+                return;
+            }
+
+            snd_pcm_t *handle = nullptr;
+            int err;
+
+            err = snd_pcm_open(&handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
+            if (err < 0) {
+                qDebug() << "[ALSA] Error al abrir dispositivo:" << snd_strerror(err);
+                return;
+            }
+
+            err = snd_pcm_set_params(handle,
+                                     SND_PCM_FORMAT_S16_LE,
+                                     SND_PCM_ACCESS_RW_INTERLEAVED,
+                                     2,      // canales
+                                     44100,  // frecuencia
+                                     1,      // resample software permitido
+                                     50000); // latencia 50ms
+            if (err < 0) {
+                qDebug() << "[ALSA] Error al configurar parámetros:" << snd_strerror(err);
+                snd_pcm_close(handle);
+                return;
+            }
+
+            snd_pcm_sframes_t frames = snd_pcm_writei(handle, pcmData.constData(), pcmData.size() / bytesPerFrame);
+            if (frames < 0) {
+                qDebug() << "[ALSA] Error escribiendo datos:" << snd_strerror(frames);
+            } else if (frames != static_cast<snd_pcm_sframes_t>(pcmData.size() / bytesPerFrame)) {
+                qDebug() << "[ALSA] Solo se escribieron" << frames << "frames de" << (pcmData.size() / bytesPerFrame);
+            }
+
+            snd_pcm_drain(handle);
+            snd_pcm_close(handle);
+            qDebug() << "[ALSA] Reproducción finalizada:" << fullPath;
+        });
     }
-
 signals:
     void appClosed();
     void commandOutput(const QString &text);
