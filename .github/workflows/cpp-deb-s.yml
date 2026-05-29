@@ -1,10 +1,9 @@
-name: Generar Paquete DEB y Publicar APT
+name: Generar Paquete DEB (>stable)
 
 on:
   push:
     branches:
-      - "main"    # → unstable
-      - "stable"  # → stable
+      - "stable"  # Se ejecuta solo cuando subes algo a la rama stable
 
 permissions:
   contents: write
@@ -12,11 +11,6 @@ permissions:
 jobs:
   deploy-apt-repo:
     runs-on: ubuntu-22.04
-
-    env:
-      # Codename según la rama
-      CODENAME: ${{ github.ref_name == 'main' && 'unstable' || github.ref_name }}
-      DEB_SUFFIX: ${{ github.ref_name == 'main' && 'unstable' || 'stable' }}
 
     steps:
       - name: Descargar código fuente
@@ -36,7 +30,7 @@ jobs:
           version: '6.4.2'
           aqtversion: '==3.1.5'
           modules: 'qt5compat'
-
+          
       - name: Compilar Viewport (appvpt01)
         run: |
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${{ steps.qt.outputs.qt_prefix }}
@@ -59,9 +53,9 @@ jobs:
           cp CommandPill.qml debian_package/vpt/bin/
           cp azaretmono.ttf debian_package/vpt/bin/
           cp -r src debian_package/vpt/bin/
-
+          
           VERSION="1.0.${{ github.run_number }}"
-
+          
           cat <<EOF > debian_package/DEBIAN/control
           Package: viewport
           Version: $VERSION
@@ -73,70 +67,58 @@ jobs:
           Recommends: fonts-nunito
           Description: Entorno grafico ultraligero y ultracustomizable.
           EOF
+          
+          dpkg-deb --build debian_package viewport_stable.deb
+          mv viewport_stable.deb /tmp/viewport.deb
 
-          dpkg-deb --build debian_package viewport_${DEB_SUFFIX}.deb
-          mv viewport_${DEB_SUFFIX}.deb /tmp/viewport.deb
-
-      - name: Configurar, firmar y publicar repositorio APT (convivencia)
+      - name: Configurar, firmar y publicar repositorio APT (stable)
         run: |
           git fetch origin
           git checkout gh-pages || git checkout --orphan gh-pages
 
-          # No limpiamos el directorio: así mantenemos ambos codenames
+          find . -mindepth 1 -maxdepth 1 -not -name '.git' -exec rm -rf {} \;
+          rm -rf /tmp/reprepro_temp
           mkdir -p conf
 
-          # Definimos ambos componentes en la configuración de reprepro
+          # Repositorio con codename 'stable'
           cat <<EOF > conf/distributions
           Origin: Viewport Repository
-          Label: Viewport Unstable
-          Codename: unstable
-          Suite: unstable
-          Architectures: amd64
-          Components: main
-          Description: Repositorio inestable para Viewport
-
-          Origin: Viewport Repository
           Label: Viewport Stable
-          Codename: stable
           Suite: stable
+          Codename: stable
           Architectures: amd64
           Components: main
           Description: Repositorio estable para Viewport
           EOF
 
-          # Añadimos el paquete al codename actual
-          reprepro -b . includedeb ${CODENAME} /tmp/viewport.deb
-
-          # Exportamos índices y limpiamos huérfanos
-          reprepro -b . export
           reprepro -b . clearvanished
+          reprepro -b . includedeb stable /tmp/viewport.deb
+          reprepro -b . export
           reprepro -b . createsymlinks
 
-          # Verificamos y corregimos el hash de Packages.gz si es necesario
-          cd dists/${CODENAME}
+          # Reconstruir Release si el hash de Packages.gz no coincide
+          cd dists/stable
           md5sum main/binary-amd64/Packages.gz > /tmp/check_md5
           if ! grep -q "$(cat /tmp/check_md5)" Release; then
-            echo "⚠️ Regenerando Release manualmente para ${CODENAME}"
+            echo "⚠️ Regenerando Release manualmente"
             cd ../..
             reprepro -b . export
           else
             cd ../..
           fi
 
-          # Importamos la clave GPG y firmamos el Release del codename actual
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
           echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --pinentry-mode loopback \
             --passphrase-fd 0 \
             --detach-sign --armor \
-            --output dists/${CODENAME}/Release.gpg \
-              dists/${CODENAME}/Release
+            --output dists/stable/Release.gpg \
+              dists/stable/Release
 
-          # Exportamos la clave pública y aseguramos el CNAME
           gpg --armor --export > publickey.asc
-          echo "vpt.soyss.cc" > CNAME
 
+          echo "vpt.soyss.cc" > CNAME
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action Bot"
           git add --all
-          git commit -m "🔧 APT ${CODENAME}: v${{ github.run_number }} (firmado)"
+          git commit -m "🔧 APT stable: v${{ github.run_number }} (firmado)"
           git push origin gh-pages --force
