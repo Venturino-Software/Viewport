@@ -1,0 +1,124 @@
+name: Generar Paquete DEB (>stable)
+
+on:
+  push:
+    branches:
+      - "stable"  # Se ejecuta solo cuando subes algo a la rama stable
+
+permissions:
+  contents: write
+
+jobs:
+  deploy-apt-repo:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Descargar código fuente
+        uses: actions/checkout@v4
+
+      - name: Instalar dependencias del sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build \
+                                  libgl1-mesa-dev libxkbcommon-dev \
+                                  libvulkan-dev libdbus-1-dev reprepro libasound2-dev
+
+      - name: Instalar Qt 6.4.2
+        id: qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.4.2'
+          aqtversion: '==3.1.5'
+          modules: 'qt5compat'
+          
+      - name: Compilar Viewport (appvpt01)
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${{ steps.qt.outputs.qt_prefix }}
+          cmake --build build
+
+      - name: Crear y empaquetar .deb
+        run: |
+          mkdir -p debian_package/vpt/bin
+          mkdir -p debian_package/DEBIAN
+
+          cp build/appvpt01 debian_package/vpt/bin/viewport
+          cp Main.qml debian_package/vpt/bin/
+          cp StyledPopup.qml debian_package/vpt/bin/
+          cp StyledButton.qml debian_package/vpt/bin/
+          cp FontManager.qml debian_package/vpt/bin/
+          cp nunito.ttf debian_package/vpt/bin/
+          cp nunitor.ttf debian_package/vpt/bin/
+          cp changaone.ttf debian_package/vpt/bin/
+          cp FirstStart.qml debian_package/vpt/bin/
+          cp CommandPill.qml debian_package/vpt/bin/
+          cp azaretmono.ttf debian_package/vpt/bin/
+          cp -r src debian_package/vpt/bin/
+          
+          VERSION="1.0.${{ github.run_number }}"
+          
+          cat <<EOF > debian_package/DEBIAN/control
+          Package: viewport
+          Version: $VERSION
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: VNT <zeus.ruffo@icloud.com>
+          Depends: libqt6core6, libqt6gui6, libqt6qml6, libqt6quick6, libqt6core5compat6, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-shapes, qml6-module-qt5compat-graphicaleffects, libasound2
+          Recommends: fonts-nunito
+          Description: Entorno grafico ultraligero y ultracustomizable.
+          EOF
+          
+          dpkg-deb --build debian_package viewport_stable.deb
+          mv viewport_stable.deb /tmp/viewport.deb
+
+      - name: Configurar, firmar y publicar repositorio APT (stable)
+        run: |
+          git fetch origin
+          git checkout gh-pages || git checkout --orphan gh-pages
+
+          find . -mindepth 1 -maxdepth 1 -not -name '.git' -exec rm -rf {} \;
+          rm -rf /tmp/reprepro_temp
+          mkdir -p conf
+
+          # Repositorio con codename 'stable'
+          cat <<EOF > conf/distributions
+          Origin: Viewport Repository
+          Label: Viewport Stable
+          Suite: stable
+          Codename: stable
+          Architectures: amd64
+          Components: main
+          Description: Repositorio estable para Viewport
+          EOF
+
+          reprepro -b . clearvanished
+          reprepro -b . includedeb stable /tmp/viewport.deb
+          reprepro -b . export
+          reprepro -b . createsymlinks
+
+          # Reconstruir Release si el hash de Packages.gz no coincide
+          cd dists/stable
+          md5sum main/binary-amd64/Packages.gz > /tmp/check_md5
+          if ! grep -q "$(cat /tmp/check_md5)" Release; then
+            echo "⚠️ Regenerando Release manualmente"
+            cd ../..
+            reprepro -b . export
+          else
+            cd ../..
+          fi
+
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --pinentry-mode loopback \
+            --passphrase-fd 0 \
+            --detach-sign --armor \
+            --output dists/stable/Release.gpg \
+              dists/stable/Release
+
+          gpg --armor --export > publickey.asc
+
+          echo "vpt.soyss.cc" > CNAME
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          git add --all
+          git commit -m "🔧 APT stable: v${{ github.run_number }} (firmado)"
+          git push origin gh-pages --force
