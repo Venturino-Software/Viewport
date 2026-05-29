@@ -27,7 +27,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build \
                                   libgl1-mesa-dev libxkbcommon-dev \
-                                  libvulkan-dev libdbus-1-dev reprepro libasound2-dev
+                                  libvulkan-dev libdbus-1-dev reprepro libasound2-dev qml6-module-qtmultimedia
 
       - name: Instalar Qt 6.4.2
         id: qt
