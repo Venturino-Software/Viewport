@@ -22,7 +22,7 @@ jobs:
           # Agregamos reprepro a esta lista:
           sudo apt-get install -y build-essential cmake ninja-build \
                                   libgl1-mesa-dev libxkbcommon-dev \
-                                  libvulkan-dev libdbus-1-dev reprepro
+                                  libvulkan-dev libdbus-1-dev reprepro libasound2-dev
 
       - name: Instalar Qt 6.4.2
         id: qt
@@ -72,7 +72,7 @@ jobs:
           Priority: optional
           Architecture: amd64
           Maintainer: VNT <zeus.ruffo@icloud.com>
-          Depends: libqt6core6, libqt6gui6, libqt6qml6, libqt6quick6, libqt6core5compat6, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-shapes, qml6-module-qt5compat-graphicaleffects
+          Depends: libqt6core6, libqt6gui6, libqt6qml6, libqt6quick6, libqt6core5compat6, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-shapes, qml6-module-qt5compat-graphicaleffects, libasound2
           Recommends: fonts-nunito
           Description: Entorno grafico ultraligero y ultracustomizable.
           EOF
