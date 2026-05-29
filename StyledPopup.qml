@@ -21,7 +21,7 @@ Popup {
     // Protección global del escalado (dpScale)
     readonly property real dp: typeof dpScale !== "undefined" ? dpScale : 1.0
     padding: 24 * dp
-
+    property string title: ""
     property string fontType: "body"  // "title", "body" o "mono"
     readonly property string activeFont: {
         if (typeof FontManager !== "undefined" && FontManager) {

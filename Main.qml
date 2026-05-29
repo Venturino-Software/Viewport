@@ -155,6 +155,56 @@ Component.onCompleted: {
     updateSearchFilter("") // Inicializa la lista del buscador
 }
 
+
+function ntftst() {
+    // 1. Asegúrate de que la ruta sea correcta. Si están en la misma carpeta, esto está bien.
+    var component = Qt.createComponent("StyledNotification.qml");
+
+    // Función auxiliar para instanciar cuando esté listo
+    function createAndShow() {
+        if (component.status === Component.Ready) {
+
+            // 2. Creamos el objeto. Pasamos mainWindow.contentItem (o null si mainWindow no existe)
+            var parentItem = typeof mainWindow !== "undefined" ? mainWindow.contentItem : null;
+
+            var notification = component.createObject(parentItem, {
+                "titulo": "¡Hola Mundo!",
+                "contenidoResumido": "Esta es una notificación de prueba.",
+                "contenidoTotal": "¡Hello World desde QML! Esta es una notificación expandida.",
+                "icono": "",
+                "playSound": false,
+                "duration": 5000,
+                "bgColor": "#1a1c2b",
+                "accentColor": "#7f99ff",
+                "popupRadius": 10
+            });
+
+            if (notification !== null) {
+                // 3. ¡CRÍTICO! Destruir el Popup cuando se cierre para evitar Memory Leaks
+                notification.closed.connect(function() {
+                    console.log("[ntftst] Liberando memoria de la notificación...");
+                    notification.destroy();
+                });
+
+                // 4. Abrimos la notificación
+                notification.open();
+            } else {
+                console.error("[ntftst] Error: createObject devolvió null.");
+            }
+        } else if (component.status === Component.Error) {
+            console.error("[ntftst] Error al compilar el QML:", component.errorString());
+        }
+    }
+
+    // Comprobamos el estado. Si está listo, lo creamos. Si está cargando, esperamos la señal.
+    if (component.status === Component.Ready) {
+        createAndShow();
+    } else {
+        console.log("[ntftst] Componente cargando, esperando señal statusChanged...");
+        component.statusChanged.connect(createAndShow);
+    }
+}
+
 // Función para actualizar el modelo filtrado según el texto
 // Función para actualizar el modelo filtrado según el texto
 function updateSearchFilter(text) {
@@ -201,13 +251,14 @@ function updateSearchFilter(text) {
 
     if (prefix === PFX.SYSTEM) {
         var sysCmds = [
+            {n: "Actualizar", c: "Software", e: "VPT_SYS|update"},
+            {n: "Version", c: "Sistema", e: "VPT_SYS|"},
             {n: "Apagar", c: "Alimentación", e: "VPT_SYS|poweroff"},
             {n: "Reiniciar", c: "Alimentación", e: "VPT_SYS|reboot"},
             {n: "Salir a TTY", c: "Alimentación", e: "VPT_SYS|exit_vpt"},
             {n: "Ajustar Volumen", c: "Audio", e: "VPT_SYS|volume"},
             {n: "Ajustar Brillo", c: "Pantalla", e: "VPT_SYS|brightness"},
             {n: "Redes WiFi", c: "Redes", e: "VPT_SYS|wifi"},
-            {n: "Setup", c: "OOBE", e: "VPT_OOBE|"}
         ]
 
         for (var j = 0; j < sysCmds.length; j++) {
@@ -284,6 +335,12 @@ function executeSmartAction(execString, appName) {
         case "wifi":
             wifiPopup.open()
             break
+        case "update":
+            updateManager.open()
+            break
+        case "notiftest":
+            ntftst()
+            break
         default:
             // Cualquier otro comando directo (ej: kitty -e nmtui)
             AppBackend.openApp(sysCmd)
@@ -306,9 +363,6 @@ function executeSmartAction(execString, appName) {
             // 2. Limpiá el texto del input para que la próxima vez arranque vacío
             // Cambiá 'idDelInputText' por el ID real de tu TextField de búsqueda
             searchInput.text = ""
-
-            // 3. Vaciá el modelo filtrado para borrar los resultados visuales de la RAM
-            filteredSearchModel.clear()
 }
 
 function hideAllPopups() {
@@ -317,7 +371,100 @@ function hideAllPopups() {
     volumePopup.close()
     brightnessPopup.close()
     wifiPopup.close()
+
+            // 3. Vaciá el modelo filtrado para borrar los resultados visuales de la RAM
+            filteredSearchModel.clear()
     aptPopup.close()
+}
+
+function runManualCommand() {
+    var rawCmd = cmdInput.text.trim();
+    if (rawCmd === "") return;
+
+    var prefix = terminalPrefixCombo.currentText;
+    var fullCmd = (prefix === "$") ? rawCmd : prefix.toLowerCase() + " " + rawCmd;
+
+    outputArea.append("\n$ " + fullCmd);
+    outputArea.cursorPosition = outputArea.length;
+
+    AppBackend.runCommandWithOutput(fullCmd);
+
+    cmdInput.text = "";
+    progressBar.value = 0.0;
+    progressBar.visible = false;
+}
+
+StyledPopup {
+    id: versionPopup
+    width: Math.min(800 * dpScale, parent ? parent.width * 0.95 : 800)
+    height: 550 * dpScale
+    popupRadius: 16 * dpScale
+    fontType: "body"
+    Shortcut {
+        sequence: "Ctrl + Alt + V"
+        onActivated: {
+            if (!versionPopup.visible) {
+                versionPopup.open();
+            } else {
+                versionPopup.close();
+            }
+        }
+    }
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: 30 * dpScale
+        spacing: 20 * dpScale
+
+        // Título del Entorno
+        Text {
+            text: "ATP System Information"
+            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.monoFontFamily) ?
+                         FontManager.monoFontFamily : "header"
+            font.pixelSize: 22 * dpScale
+            color: "#ffffff"
+            font.bold: true
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        // Logo Centrado
+        Image {
+            id: atplogo
+            source: "qrc:/assets/logo_atp.png" // Asegurate de ajustar la ruta a tu archivo
+            sourceSize: Qt.size(120 * dpScale, 120 * dpScale)
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        // Info Técnica (Grid)
+        GridLayout {
+            columns: 2
+            columnSpacing: 20 * dpScale
+            rowSpacing: 10 * dpScale
+            Layout.alignment: Qt.AlignHCenter
+
+            Repeater {
+                model: [
+                    { label: "Version:", value: "26.2.orbit" },
+                    { label: "Kernel:", value: "Linux 6.x (Optimized)" },
+                    { label: "Compiler:", value: "GCC 13.2" },
+                    { label: "Viewport:", value: "v1.0-stable" }
+                ]
+                delegate: RowLayout {
+                    Text { text: modelData.label; color: "#888888"; font.pixelSize: 14 * dpScale }
+                    Text { text: modelData.value; color: "#ffffff"; font.pixelSize: 14 * dpScale; font.bold: true }
+                }
+            }
+        }
+
+        // Footer con mensaje de estado
+        Item { Layout.fillHeight: true } // Espaciador flexible
+
+        Text {
+            text: "ATP es un entorno modular. Todos los derechos reservados."
+            font.pixelSize: 12 * dpScale
+            color: "#555555"
+            Layout.alignment: Qt.AlignHCenter
+        }
+    }
 }
 
 StyledPopup {
@@ -327,11 +474,8 @@ StyledPopup {
     width: Math.min(800 * dpScale, parent ? parent.width * 0.95 : 800)
     height: 550 * dpScale
     accentColor: "#00e676"
-    popupRadius: 16 * dpScale // Radio de bordes más redondeado (estilo popup 2)
+    popupRadius: 16 * dpScale
     fontType: "body"
-
-    // Comentar o descomentar si necesitas centrado manual
-    // disableDefs: true
 
     onOpened: {
         outputArea.text = "Ejecutando: " + command + "\n"
@@ -347,18 +491,18 @@ StyledPopup {
         anchors.margins: 20 * dpScale
         spacing: 12 * dpScale
 
-        // --- CABECERA ---
+        // --- CABECERA (ahora con fuente mono) ---
         Text {
             text: "Terminal de Viewport"
-            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ?
-                         FontManager.titleFontFamily : "DejaVu Sans"
+            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.monoFontFamily) ?
+                         FontManager.monoFontFamily : "monospace"
             font.pixelSize: 18 * dpScale
             color: "#ffffff"
             font.bold: true
             Layout.alignment: Qt.AlignHCenter
         }
 
-        // --- ÁREA DE SALIDA (OUTPUT) ---
+        // --- ÁREA DE SALIDA ---
         ScrollView {
             id: scrollArea
             Layout.fillWidth: true
@@ -383,12 +527,12 @@ StyledPopup {
             }
         }
 
-        // --- BARRA DE PROGRESO (APT / PIP) ---
+        // --- BARRA DE PROGRESO ---
         ProgressBar {
             id: progressBar
             Layout.fillWidth: true
             height: 6 * dpScale
-            visible: false // Se oculta si no hay progreso detectado
+            visible: false
             value: 0.0
 
             background: Rectangle {
@@ -401,18 +545,79 @@ StyledPopup {
                     height: parent.height
                     radius: 3 * dpScale
                     color: terminalPopup.accentColor
-
-                    // Animación suave al actualizar porcentaje
                     Behavior on width { NumberAnimation { duration: 150 } }
                 }
             }
         }
 
-        // --- INPUT DE COMANDOS MANUALES ---
+        // --- INPUT MANUAL (selector + campo + botón) ---
         RowLayout {
             Layout.fillWidth: true
-            spacing: 10 * dpScale
+            spacing: 8 * dpScale
 
+            // Selector de prefijo compacto y redondeado
+            ComboBox {
+                id: terminalPrefixCombo
+                model: ["$", "Apt", "Sudo", "Sh"]
+                Layout.preferredWidth: 90 * dpScale
+                Layout.fillHeight: true
+
+                background: Rectangle {
+                    color: "#1e1e2e"
+                    radius: 8 * dpScale
+                    border.color: terminalPrefixCombo.activeFocus ? terminalPopup.accentColor : "#333344"
+                }
+
+                contentItem: Text {
+                    text: terminalPrefixCombo.displayText
+                    color: terminalPopup.accentColor
+                    font.bold: true
+                    font.family: outputArea.font.family
+                    font.pixelSize: 13 * dpScale
+                    verticalAlignment: Text.AlignVCenter
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                popup: Popup {
+                    y: -height - (8 * dpScale)
+                    width: terminalPrefixCombo.width
+                    implicitHeight: contentItem.implicitHeight
+                    padding: 4 * dpScale
+
+                    contentItem: ListView {
+                        clip: true
+                        implicitHeight: contentHeight
+                        model: terminalPrefixCombo.popup.visible ? terminalPrefixCombo.delegateModel : null
+                        currentIndex: terminalPrefixCombo.highlightedIndex
+                        ScrollIndicator.vertical: ScrollIndicator { }
+                    }
+
+                    background: Rectangle {
+                        color: "#1e1e2e"
+                        radius: 12 * dpScale
+                        border.color: terminalPopup.accentColor
+                    }
+                }
+
+                delegate: ItemDelegate {
+                    width: terminalPrefixCombo.width
+                    height: 36 * dpScale
+                    contentItem: Text {
+                        text: modelData
+                        color: highlighted ? terminalPopup.accentColor : "#ffffff"
+                        font.bold: highlighted
+                        font.family: outputArea.font.family
+                        verticalAlignment: Text.AlignVCenter
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                    background: Rectangle {
+                        color: highlighted ? Qt.darker(terminalPopup.accentColor, 3.0) : "transparent"
+                        radius: 8 * dpScale
+                    }
+                }
+            }
+
+            // Campo de comando con detección automática de prefijos
             TextField {
                 id: cmdInput
                 Layout.fillWidth: true
@@ -428,8 +633,41 @@ StyledPopup {
                     border.color: cmdInput.activeFocus ? terminalPopup.accentColor : "#333344"
                 }
 
-                // Ejecutar con la tecla Enter
-                onAccepted: AppBackend.runCommandWithOutput(cmdInput.text)
+                // LÓGICA DE DETECCIÓN AUTOMÁTICA (heredada de CommandPill)
+                property bool _updatingText: false
+
+                onTextChanged: {
+                    if (_updatingText) return
+
+                    let t = text
+                    let rules = [
+                        { keyword: "sudo", index: 2, startOnly: false },
+                        { keyword: "apt",  index: 1, startOnly: true  },
+                        { keyword: "sh",   index: 3, startOnly: true  }
+                    ]
+
+                    for (let r of rules) {
+                        let match = null
+                        if (r.startOnly) {
+                            match = t.match(new RegExp(`^\\s*${r.keyword}(?=\\s|$)`, "i"))
+                        } else {
+                            match = t.match(new RegExp(`\\b${r.keyword}(?=\\s|$)`, "i"))
+                        }
+
+                        if (match) {
+                            if (terminalPrefixCombo.currentIndex !== r.index) {
+                                _updatingText = true
+                                terminalPrefixCombo.currentIndex = r.index
+                                let newText = t.slice(0, match.index) + t.slice(match.index + match[0].length)
+                                cmdInput.text = newText.trim().replace(/\s+/g, " ")
+                                _updatingText = false
+                            }
+                            break
+                        }
+                    }
+                }
+
+                onAccepted: runManualCommand()
             }
 
             StyledButton {
@@ -439,14 +677,15 @@ StyledPopup {
             }
         }
 
-        // --- FOOTER: WARNING Y BOTÓN CERRAR ---
+        // --- FOOTER ---
         RowLayout {
             Layout.fillWidth: true
             Layout.topMargin: 8 * dpScale
-            spacing: 12 * dpScale // Espaciado directo, sin anidar RowLayouts
+            spacing: 12 * dpScale
 
             Text {
                 text: "⚠️"
+                font.family: outputArea.font.family
                 font.pixelSize: 18 * dpScale
                 Layout.alignment: Qt.AlignVCenter
             }
@@ -454,6 +693,7 @@ StyledPopup {
             Text {
                 text: "Viewport tiene permisos infinitos. Use SUDO con cuidado."
                 color: "#ffaa00"
+                font.family: outputArea.font.family
                 font.pixelSize: 12 * dpScale
                 font.bold: true
                 wrapMode: Text.WordWrap
@@ -475,13 +715,9 @@ StyledPopup {
     Connections {
         target: AppBackend
         function onCommandOutput(output) {
-            // 1. Añadir el texto a la terminal
             outputArea.append(output)
-
-            // 2. FORZAR SCROLL ABAJO SIEMPRE
             outputArea.cursorPosition = outputArea.length
 
-            // 3. CAPTURAR PROGRESO CON REGEX
             var match = output.match(/(\d{1,3})\s*%/);
             if (match && match[1]) {
                 var percent = parseInt(match[1]);
@@ -493,19 +729,34 @@ StyledPopup {
         }
     }
 
-    // Función para manejar el TextField
+    // --- LÓGICA DE EJECUCIÓN UNIFICADA (misma que CommandPill.tryExecute) ---
     function runManualCommand() {
-        var newCmd = cmdInput.text.trim();
-        if (newCmd !== "") {
-            outputArea.append("\n$ " + newCmd);
-            outputArea.cursorPosition = outputArea.length;
+        var rawCmd = cmdInput.text.trim();
+        if (rawCmd === "") return;
 
-            AppBackend.runCommandWithOutput(newCmd);
+        var prefix = terminalPrefixCombo.currentText;
+        var fullCmd;
 
-            cmdInput.text = "";
-            progressBar.value = 0.0;
-            progressBar.visible = false;
+        if (prefix === "Sudo") {
+            fullCmd = "/usr/bin/pkexec /usr/bin/" + rawCmd;
+        } else if (prefix === "Apt") {
+            fullCmd = "/usr/bin/pkexec /usr/bin/apt " + rawCmd;
+        } else if (prefix === "$") {
+            fullCmd = rawCmd;
+        } else if (prefix === "Sh") {
+            fullCmd = "/usr/bin/sh " + rawCmd;
+        } else {
+            fullCmd = "/usr/bin/" + prefix.toLowerCase() + " " + rawCmd;
         }
+
+        outputArea.append("\n$ " + fullCmd);
+        outputArea.cursorPosition = outputArea.length;
+
+        AppBackend.runCommandWithOutput(fullCmd);
+
+        cmdInput.text = "";
+        progressBar.value = 0.0;
+        progressBar.visible = false;
     }
 }
 
@@ -582,6 +833,498 @@ StyledPopup {
 }
 
 
+/*
+  UPDATER
+*/
+StyledPopup {
+    id: updateManager
+    width: 500 * dpScale
+    height: 400 * dpScale
+    modal: true
+    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    accentColor: "#7f99ff"
+    title: "Gestor de actualizaciones VPT"
+
+    // Propiedades internas
+    property string selectedChannel: ""
+    readonly property string sourcesListPath: "/etc/apt/sources.list.d/viewport.list"
+    property var updatesConn: null
+    property int pendingUpdatesCount: 0
+    property string pendingPackagesList: ""
+    property bool checking: false
+    property bool updating: false
+    property bool updatePopupOpen: false
+
+    // Referencia al componente StyledPopup (se usará para crear popups hijos)
+    property var popupComponent: null
+
+    onOpened: {
+        // Pequeño retraso para que el backend esté listo
+        Qt.callLater(function() {
+            readChannelAndInit()
+        })
+    }
+
+    // Elimina Component.onCompleted (o déjalo solo para cargar popupComponent)
+    // Para depuración: imprime quién cierra el popup
+    onClosed: {
+        console.log("UpdateManager cerrado. Stack: " + new Error().stack)
+        timerCheck.stop()
+        if (updatesConn) updatesConn.disconnect()
+    }
+
+    Component.onCompleted: {
+        popupComponent = Qt.createComponent("StyledPopup.qml")
+        if (popupComponent.status !== Component.Ready) {
+            console.error("No se pudo cargar StyledPopup.qml:", popupComponent.errorString())
+        }
+    }
+
+    function readChannelAndInit() {
+        let content = AppBackend.readFile(sourcesListPath)
+        console.log("=== readChannelAndInit ===")
+        console.log("Contenido CRUDO del archivo:", JSON.stringify(content))
+
+        if (!content || content === "") {
+            console.log("Archivo vacío → mostrar selector de canal")
+            showChannelConfigPopup()
+            return
+        }
+
+        // 🔥 CORREGIDO: buscar "unstable" primero
+        let channel = "desconocido"
+        if (content.includes("unstable")) {
+            channel = "unstable"
+        } else if (content.includes("stable")) {
+            channel = "stable"
+        }
+
+        console.log("Canal detectado:", channel)
+        selectedChannel = channel
+        selectedChannelChanged()  // Forzar notificación
+
+        if (selectedChannel !== "" && selectedChannel !== "desconocido") {
+            checkForUpdates()
+
+        }
+    }
+    // ─────────────────────────────────────────────────
+    // POPUP DE SELECCIÓN DE CANAL (stable / unstable)
+    // ─────────────────────────────────────────────────
+    function showChannelConfigPopup() {
+        if (!popupComponent || popupComponent.status !== Component.Ready) return
+
+        let configPopup = popupComponent.createObject(Overlay.overlay, {
+            width: 400 * dpScale,
+            height: 200 * dpScale,
+            modal: true,
+            closePolicy: Popup.CloseOnEscape,
+            accentColor: "#ffaa44",
+            title: "Configurar canal de actualizaciones"
+        })
+
+        // Crear el contenido a partir del Component estático
+        let contentObj = channelConfigContent.createObject(configPopup)
+        contentObj.popupRef = configPopup
+        configPopup.contentItem = contentObj
+
+        configPopup.open()
+    }
+
+    Component {
+        id: channelConfigContent
+        ColumnLayout {
+            property var popupRef: null
+
+            anchors.fill: parent
+            anchors.margins: 20 * dpScale
+            spacing: 15 * dpScale
+
+            Text {
+                text: "Elige el canal de distribución para las actualizaciones del sistema."
+                color: "#cccccc"
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                font.pixelSize: 13 * dpScale
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 15 * dpScale
+
+                StyledButton {
+                    text: "CANAL STABLE"
+                    buttonColor: "#2ecc71"
+                    Layout.fillWidth: true
+                    onClicked: {
+                        updateManager.configureChannel("stable")  // ← funciona porque updateManager está en contexto
+                        popupRef.close()
+                    }
+                }
+                StyledButton {
+                    text: "CANAL UNSTABLE"
+                    buttonColor: "#e67e22"
+                    Layout.fillWidth: true
+                    onClicked: {
+                        updateManager.configureChannel("unstable")
+                        popupRef.close()
+                    }
+                }
+            }
+        }
+    }
+    function configureChannel(channel) {
+        selectedChannel = channel
+        let repoLine = `deb [signed-by=/etc/apt/keyrings/vpt-archive-keyring.gpg] http://vpt.soyss.cc ${channel} main`
+        let cmd = `echo "${repoLine}" | pkexec tee ${sourcesListPath} > /dev/null`
+        AppBackend.runPkexec(cmd)
+        // Forzar notificación de cambio (por si acaso)
+        selectedChannelChanged()
+        onSelectedChannelChanged: {
+            console.log("selectedChannel cambió a:", selectedChannel)
+        }
+        // Esperar un momento a que se escriba el archivo y luego comprobar
+        timerCheck.start()
+    }
+
+    Timer {
+        id: timerCheck
+        interval: 800
+        onTriggered: updateManager.checkForUpdates()
+    }
+
+    // ─────────────────────────────────────────────────
+    // COMPROBACIÓN DE ACTUALIZACIONES
+    // ─────────────────────────────────────────────────
+    function checkForUpdates() {
+        if (checking) {
+            console.log("checkForUpdates: ya en curso")
+            return
+        }
+        checking = true
+        // Desconectar conexión anterior de forma segura
+        if (updatesConn) {
+            AppBackend.updatesAvailable.disconnect(updatesConn)
+            updatesConn = null
+        }
+        updatesConn = function(count, pkgList) {
+            checkTimeout.stop()
+            checking = false
+            pendingUpdatesCount = count
+            pendingPackagesList = pkgList
+            if (count > 0) {
+                showUpdateAvailablePopup(count, pkgList)
+            } else {
+                showInfoPopup("El sistema está actualizado ✓", 2000)
+            }
+            // Desconectar esta conexión después de usarla
+            AppBackend.updatesAvailable.disconnect(updatesConn)
+            updatesConn = null
+        }
+        AppBackend.updatesAvailable.connect(updatesConn)
+        AppBackend.checkForUpdates()
+        checkTimeout.start()
+    }
+
+    Timer {
+        id: checkTimeout
+        interval: 30000
+        onTriggered: {
+            checking = false
+            showInfoPopup("Error: la verificación de actualizaciones no respondió.", 5000, "#ff6b6b")
+            if (updatesConn) updatesConn.disconnect()
+            updatesConn = null
+        }
+    }
+
+    // Pequeña notificación emergente (info/error)
+    function showInfoPopup(message, duration, accent) {
+        if (!popupComponent || popupComponent.status !== Component.Ready) return
+        let pop = popupComponent.createObject(Overlay.overlay, {
+            width: 300 * dpScale,
+            height: 80 * dpScale,
+            modal: false,
+            closePolicy: Popup.NoAutoClose,
+            accentColor: accent || "#2ecc71",
+            title: "Información"
+        })
+        pop.contentItem = Qt.createQmlObject(`
+            import QtQuick
+            Text {
+                anchors.centerIn: parent
+                text: ${JSON.stringify(message)}
+                color: "white"
+                wrapMode: Text.WordWrap
+                font.pixelSize: 13 * ${dpScale}
+            }
+        `, pop)
+        pop.open()
+
+        // Autocierre
+        Qt.createQmlObject(`
+            import QtQuick
+            Timer {
+                interval: ${duration}
+                running: true
+                onTriggered: {
+                    parent.close()
+                    destroy()
+                }
+            }
+        `, pop)
+    }
+
+    // ─────────────────────────────────────────────────
+    // POPUP DE ACTUALIZACIONES DISPONIBLES
+    // ─────────────────────────────────────────────────
+    function showUpdateAvailablePopup(count, pkgList) {
+        if (updatePopupOpen) {
+            console.log("Ya hay un popup de actualización abierto")
+            return
+        }
+        if (!popupComponent || popupComponent.status !== Component.Ready) return
+            updatePopupOpen = true
+
+        let pop = popupComponent.createObject(Overlay.overlay, {
+            width: 450 * dpScale,
+            height: 300 * dpScale,
+            modal: true,
+            closePolicy: Popup.CloseOnEscape,
+            accentColor: "#f39c12",
+            title: `📦 ${count} actualización(es) disponible(s)`
+        })
+        pop.onClosed.connect(function() {
+            updatePopupOpen = false
+        })
+        pop.contentItem = Qt.createQmlObject(`
+            import QtQuick
+            import QtQuick.Layouts
+
+            ColumnLayout {
+                property var popupRef: null
+                anchors.fill: parent
+                anchors.margins: 20 * ${dpScale}
+                spacing: 12 * ${dpScale}
+
+                Text {
+                    text: "Paquetes: " + ${JSON.stringify(pkgList)}
+                    color: "#dddddd"
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                    font.pixelSize: 12 * ${dpScale}
+                    font.family: "monospace"
+                }
+
+                Text {
+                    text: "¿Desea instalarlas ahora?"
+                    color: "white"
+                    font.bold: true
+                    Layout.alignment: Qt.AlignHCenter
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 15 * ${dpScale}
+
+                    StyledButton {
+                        text: "Actualizar ahora"
+                        buttonColor: "#2ecc71"
+                        Layout.fillWidth: true
+                        onClicked: {
+                            popupRef.close()
+                            updateManager.startUpgrade()
+                        }
+                    }
+                    StyledButton {
+                        text: "Recordar más tarde"
+                        Layout.fillWidth: true
+                        onClicked: popupRef.close()
+                    }
+                }
+            }
+        `, pop, "dynamicUpdateLayout")
+
+        pop.contentItem.popupRef = pop
+        pop.open()
+    }
+
+    // ─────────────────────────────────────────────────
+    // POPUP DE ACTUALIZACIÓN (TERMINAL)
+    // ─────────────────────────────────────────────────
+    function startUpgrade() {
+        if (updating) return
+        updating = true
+
+        let termPopup = popupComponent.createObject(Overlay.overlay, {
+            width: 700 * dpScale,
+            height: 500 * dpScale,
+            modal: true,
+            closePolicy: Popup.CloseOnEscape,
+            accentColor: "#2ecc71",
+            title: "Actualizando sistema"
+        })
+
+        termPopup.contentItem = Qt.createQmlObject(`
+            import QtQuick
+            import QtQuick.Controls
+            import QtQuick.Layouts
+
+            ColumnLayout {
+                property var popupRef: null
+                property alias progressBar: upgradeProgress
+                property alias logArea: logArea
+
+                anchors.fill: parent
+                anchors.margins: 20 * ${dpScale}
+                spacing: 12 * ${dpScale}
+
+                ProgressBar {
+                    id: upgradeProgress
+                    Layout.fillWidth: true
+                    value: 0
+                    visible: false
+                }
+                ScrollView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    TextArea {
+                        id: logArea
+                        readOnly: true
+                        color: "#ccddee"
+                        font.family: "monospace"
+                        font.pixelSize: 12 * ${dpScale}
+                        background: Rectangle { color: "#0e0e18"; radius: 6 }
+                    }
+                }
+                StyledButton {
+                    text: "Cerrar"
+                    Layout.alignment: Qt.AlignRight
+                    onClicked: popupRef.close()
+                }
+            }
+        `, termPopup, "dynamicTerminalLayout")
+
+        termPopup.contentItem.popupRef = termPopup
+
+        // Conectar salida del comando
+        var conn = AppBackend.commandOutput.connect(function(out) {
+            if (termPopup.contentItem && termPopup.contentItem.logArea) {
+                termPopup.contentItem.logArea.append(out)
+                // Detectar porcentaje para la barra
+                var match = out.match(/(\d{1,3})\s*%/);
+                if (match) {
+                    termPopup.contentItem.progressBar.visible = true
+                    termPopup.contentItem.progressBar.value = parseInt(match[1]) / 100
+                }
+            }
+        })
+
+        // Ejecutar actualización
+        AppBackend.runPkexec("apt upgrade -y 2>&1")
+
+        // Cuando se cierre el popup, desconectar y reiniciar verificación
+        termPopup.onClosed.connect(function() {
+            updating = false
+            conn.disconnect()
+            timerCheck.start()
+        })
+
+        termPopup.open()
+    }
+
+    // ─────────────────────────────────────────────────
+    // UI DEL POPUP PRINCIPAL (mientras se comprueba)
+    // ─────────────────────────────────────────────────
+    contentItem: ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: 20 * dpScale
+        spacing: 15 * dpScale
+
+        RowLayout {
+            Layout.fillWidth: true
+            Text {
+                text: "Canal actual: "
+                color: "#cccccc"
+                font.pixelSize: 14 * dpScale
+            }
+            Text {
+                text: {
+                    if (updateManager.selectedChannel === "") return "SIN CONFIGURAR"
+                    if (updateManager.selectedChannel === "desconocido") return "DESCONOCIDO"
+                    return updateManager.selectedChannel.toUpperCase()
+                }
+                color: if (updateManager.selectedChannel == "unstable") return "#e67e22"; else if (updateManager.selectedChannel == "stable") return "#2ecc71"; else return "#aaaaaa"
+                font.bold: true
+                font.pixelSize: 14 * dpScale
+            }
+            Item { Layout.fillWidth: true }
+            StyledButton {
+                text: "Cambiar canal"
+                fontSize: 11 * dpScale
+                minHeight: 30 * dpScale
+                onClicked: updateManager.showChannelConfigPopup()
+            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            height: 120 * dpScale
+            color: "#0a0c16"
+            radius: 8 * dpScale
+            border.color: "#2a2c3a"
+
+            Column {
+                anchors.centerIn: parent
+                spacing: 8
+                BusyIndicator {
+                    running: updateManager.checking  // ← usa updateManager.
+                    visible: updateManager.checking  // ← usa updateManager.
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+                Text {
+                    text: checking ? "Buscando actualizaciones..." :
+                           (pendingUpdatesCount > 0 ? `📦 ${pendingUpdatesCount} actualizaciones disponibles` : "✅ Sistema actualizado")
+                    color: pendingUpdatesCount > 0 ? "#f1c40f" : "#2ecc71"
+                    font.bold: true
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+                TextArea {
+                    readOnly: true
+                    color: "#bbbbbb"
+                    font.pixelSize: 11 * dpScale
+                    font.family: "monospace"
+                    background: Rectangle { color: "transparent" }
+                    text: pendingUpdatesCount > 0 ? pendingPackagesList : ""
+                    wrapMode: Text.WordWrap
+                    width: parent.width - 20
+                }
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 15 * dpScale
+            StyledButton {
+                text: "Buscar actualizaciones"
+                buttonColor: updateManager.accentColor
+                Layout.fillWidth: true
+                onClicked: updateManager.checkForUpdates()
+            }
+            StyledButton {
+                text: "Actualizar ahora"
+                Layout.fillWidth: true
+                buttonColor: pendingUpdatesCount > 0 ? "#2ecc71" : "#555"
+                enabled: pendingUpdatesCount > 0 && !updating
+                onClicked: updateManager.startUpgrade()
+            }
+            StyledButton {
+                text: "Cerrar"
+                Layout.fillWidth: true
+                onClicked: updateManager.close()
+            }
+        }
+    }
+}
 StyledPopup {
   id: powerWarn
   property string pendingCommand: ""
@@ -613,7 +1356,7 @@ StyledPopup {
       }
 
       Text {
-          text: "Te preguntamos esto para prevenir toques accidentales"
+          text: "Asegurate de tener todo guardado, debido a que estas acciones pueden hacer perder tu progreso"
           color: "#aaaaaa"
           font.pixelSize: 12 * dpScale
           wrapMode: Text.WordWrap
@@ -675,7 +1418,7 @@ StyledPopup {
             buttonColor: "#d32f2f"
             Layout.fillWidth: true
             onClicked: {
-                powerWarn.pendingCommand = "/user/bin/pkexec /usr/bin/systemctl poweroff"
+                powerWarn.pendingCommand = "/usr/bin/pkexec /usr/bin/systemctl poweroff"
                 powerWarn.open()
             }
         }
@@ -1109,9 +1852,12 @@ StyledPopup {
 Item {
     anchors.fill: parent
     z: -1
-    Rectangle {
+    Image {
+        id: bg
+        source: "orbit.png"
         anchors.fill: parent
-        color: "#0a0a14"
+        fillMode: Image.PreserveAspectCrop // Esto llena todo el espacio
+        smooth: true
     }
 }
 
@@ -1296,6 +2042,8 @@ Item {
     }
 }
 
+
+
 /* STREAMING_CHUNK:Implementing the search overlay... */
 // ============= OVERLAY DE BÚSQUEDA =============
 Item {
@@ -1305,8 +2053,6 @@ Item {
     opacity: 0
     z: 50
 
-    // Fondo oscuro
-    // REEMPLAZA EL "Fondo oscuro" POR ESTO:
         RadialGradient {
             anchors.fill: parent
             horizontalOffset: 0
@@ -1348,7 +2094,6 @@ Item {
         border.width: 1
         clip: true
 
-        // REEMPLAZA LA "Sombra panel" POR ESTO:
                 RectangularGlow {
                     anchors.fill: parent
                     glowRadius: 35 * dpScale

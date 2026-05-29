@@ -261,6 +261,8 @@ void Backend::openApp(const QString &execCommand) {
     qDebug() << "[C++] Ejecutando:" << program << args;
     m_currentProcess->start(program, args);
 }
+
+
 void Backend::runCommandWithOutput(const QString &command) {
     QProcess *proc = new QProcess(this);
     proc->setProcessChannelMode(QProcess::MergedChannels);
@@ -313,8 +315,9 @@ void Backend::setVolume(int vol) {
 }
 
 void Backend::playTestSound() {
-    QProcess::startDetached("aplay", {"/vpt/etc/sounds/test.wav"});
+    QProcess::startDetached("aplay", {"/src/test.wav"});
 }
+
 
 int Backend::getBrightness() {
     QProcess p;
@@ -406,6 +409,82 @@ void Backend::connectWifi(const QString &ssid, const QString &password) {
     args << "device" << "wifi" << "connect" << ssid;
     if (!password.isEmpty()) args << "password" << password;
     QProcess::startDetached("/usr/bin/pkexec", QStringList() << "/usr/bin/nmcli" << args);
+}
+void Backend::runPkexec(const QString &command) {
+    QProcess *proc = new QProcess(this);
+    proc->start("/usr/bin/pkexec", QStringList() << "sh" << "-c" << command);
+    connect(proc, &QProcess::readyReadStandardOutput, this, [proc, this]() {
+        QString out = QString::fromUtf8(proc->readAllStandardOutput());
+        if (!out.isEmpty()) emit commandOutput(out);
+    });
+    connect(proc, &QProcess::readyReadStandardError, this, [proc, this]() {
+        QString err = QString::fromUtf8(proc->readAllStandardError());
+        if (!err.isEmpty()) emit commandOutput("[ERROR] " + err);
+    });
+    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [proc, this](int exitCode) {
+                if (exitCode != 0) emit commandOutput(QString("\nComando terminado con código %1").arg(exitCode));
+                proc->deleteLater();
+            });
+    connect(proc, &QProcess::errorOccurred, this, [proc, this](QProcess::ProcessError err) {
+        emit commandOutput(QString("[pkexec error] %1").arg(err));
+        proc->deleteLater();
+    });
+}
+
+void Backend::checkForUpdates() {
+    // 1. Ejecutar apt update con permisos (pedirá autenticación gráfica)
+    QProcess *updateProc = new QProcess(this);
+    updateProc->start("/usr/bin/pkexec", QStringList() << "apt" << "update");
+
+    // Cuando termine apt update (bien o mal), procedemos al listado
+    connect(updateProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, updateProc](int exitCode) {
+                if (exitCode != 0) {
+                    // Si falla el update, emitimos 0 actualizaciones y un mensaje de error
+                    emit updatesAvailable(0, "Error al actualizar la lista de paquetes");
+                    updateProc->deleteLater();
+                    return;
+                }
+
+                // 2. Ahora obtener la lista de paquetes actualizables (sin pkexec)
+                QProcess *listProc = new QProcess(this);
+                QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+                env.insert("LC_ALL", "C");   // forzar inglés para "upgradable from"
+                listProc->setProcessEnvironment(env);
+                listProc->start("apt", QStringList() << "list" << "--upgradable");
+
+                connect(listProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+                        this, [this, listProc](int) {
+                            QString data = QString::fromUtf8(listProc->readAllStandardOutput());
+                            int count = 0;
+                            QStringList packages;
+                            QStringList lines = data.split('\n');
+                            for (const QString &line : lines) {
+                                if (line.contains("upgradable from")) {
+                                    count++;
+                                    QString pkg = line.split('/').first().trimmed();
+                                    packages << pkg;
+                                }
+                            }
+                            // Siempre emitimos la señal, incluso si count es 0
+                            emit updatesAvailable(count, packages.join(", "));
+                            listProc->deleteLater();
+                        });
+                // Manejar error del listado
+                connect(listProc, &QProcess::errorOccurred, this, [this, listProc]() {
+                    emit updatesAvailable(0, "Error al listar paquetes");
+                    listProc->deleteLater();
+                });
+
+                updateProc->deleteLater();
+            });
+
+    // Si apt update no puede iniciar, emitimos error
+    connect(updateProc, &QProcess::errorOccurred, this, [this, updateProc]() {
+        emit updatesAvailable(0, "Error al ejecutar apt update");
+        updateProc->deleteLater();
+    });
 }
 
 void Backend::aptInstall(const QString &package, const QString &sudoPassword) {

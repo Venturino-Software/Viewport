@@ -190,6 +190,46 @@ Item {
 
                 Keys.onReturnPressed: rootPill.tryExecute()
                 Keys.onEnterPressed: rootPill.tryExecute()
+                // Detección automática de prefijos
+                property bool _updatingText: false
+
+                onTextChanged: {
+                    if (_updatingText) return
+
+                    let t = text
+                    let lower = t.toLowerCase()
+
+                    // Define las reglas: palabra clave, índice en el ComboBox, solo al inicio o en cualquier parte
+                    let rules = [
+                        { keyword: "sudo", index: 2, startOnly: false },  // Sudo en cualquier posición
+                        { keyword: "apt",  index: 1, startOnly: true  },
+                        { keyword: "sh",   index: 3, startOnly: true  }
+                    ]
+
+                    for (let r of rules) {
+                        let match = null
+                        if (r.startOnly) {
+                            // Solo al principio (ignorando espacios iniciales)
+                            match = t.match(new RegExp(`^\\s*${r.keyword}(?=\\s|$)`, "i"))
+                        } else {
+                            // En cualquier lugar como palabra completa
+                            match = t.match(new RegExp(`\\b${r.keyword}(?=\\s|$)`, "i"))
+                        }
+
+                        if (match) {
+                            if (prefixCombo.currentIndex !== r.index) {
+                                _updatingText = true
+                                prefixCombo.currentIndex = r.index
+                                // Elimina la palabra clave y los espacios que la rodean
+                                let newText = t.slice(0, match.index) + t.slice(match.index + match[0].length)
+                                // Limpia espacios múltiples que puedan quedar
+                                commandInput.text = newText.trim().replace(/\s+/g, " ")
+                                _updatingText = false
+                            }
+                            break  // solo aplica una regla por cambio
+                        }
+                    }
+                }
             }
 
             // 3. BOTÓN DE ENVIAR

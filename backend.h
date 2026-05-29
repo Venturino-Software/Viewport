@@ -80,6 +80,14 @@ public:
 
     Q_INVOKABLE void runCommandWithSudo(const QString &command, const QString &password, QJSValue callback = QJSValue());
 
+    Q_INVOKABLE void runPkexec(const QString &command);
+    Q_INVOKABLE void checkForUpdates(); // combina apt update + análisis
+
+    Q_INVOKABLE void playSound(const QString &source) {
+        QString res = "/src/" + source;
+        QProcess::startDetached("aplay", {res});
+    }
+
 signals:
     void appClosed();
     void commandOutput(const QString &text);
@@ -87,6 +95,7 @@ signals:
     void aptFinished(bool success);
     void logUpdated(QString message); // <--- DEBE estar aquí
     void isFirstRunChanged();
+    void updatesAvailable(int count, const QString &packages);
 
 private:
     QProcess *m_currentProcess;
