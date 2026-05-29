@@ -1,0 +1,11 @@
+<RCC>
+    <qresource prefix="/audio">
+        <file>src/critical.wav</file>
+        <file>src/detail.wav</file>
+        <file>src/pop.wav</file>
+        <file>src/subt-ui.wav</file>
+    </qresource>
+    <qresource prefix="/image">
+        <file>src/atp-logo.png</file>
+    </qresource>
+</RCC>

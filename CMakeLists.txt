@@ -23,6 +23,7 @@ qt_add_qml_module(appvpt01
     QML_FILES CommandPill.qml
     RESOURCES build/Desktop_Qt_6_11_1-Release/StyledNotification.qrc
     QML_FILES
+    RESOURCES mainrc.qrc
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

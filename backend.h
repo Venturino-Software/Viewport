@@ -84,7 +84,7 @@ public:
     Q_INVOKABLE void checkForUpdates(); // combina apt update + análisis
 
     Q_INVOKABLE void playSound(const QString &source) {
-        QString res = "/src/" + source;
+        QString res = "/vpt/bin/src/" + source;
         QProcess::startDetached("aplay", {res});
     }
 

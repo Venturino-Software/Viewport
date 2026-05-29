@@ -13,6 +13,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Shapes
 import Qt5Compat.GraphicalEffects
+import QtMultimedia
 
 Window {
 id: root
@@ -36,6 +37,29 @@ property real dpScale: baseDpScale * zoomFactor // Ahora es dinámico, ¡escala 
 
 // Variable global para trackear la posición
 property point mousePos: Qt.point(0, 0)
+
+MediaPlayer {
+        id: sndPop
+        source: "qrc:/audio/src/pop.wav"
+audioOutput: AudioOutput {}
+}
+
+MediaPlayer {
+        id: sndSubtle
+        source: "qrc:/audio/src/subt-ui.wav"
+audioOutput: AudioOutput {}
+}
+MediaPlayer {
+        id: sndDetail
+        source: "qrc:/audio/src/detail.wav"
+audioOutput: AudioOutput {}
+}
+
+MediaPlayer {
+        id: sndCritical
+        source: "qrc:/audio/src/critical.wav"
+audioOutput: AudioOutput {}
+}
 
 Shortcut {
     sequence: "Ctrl++"
@@ -252,7 +276,7 @@ function updateSearchFilter(text) {
     if (prefix === PFX.SYSTEM) {
         var sysCmds = [
             {n: "Actualizar", c: "Software", e: "VPT_SYS|update"},
-            {n: "Version", c: "Sistema", e: "VPT_SYS|"},
+            {n: "Version", c: "Sistema", e: "VPT_SYS|vn"},
             {n: "Apagar", c: "Alimentación", e: "VPT_SYS|poweroff"},
             {n: "Reiniciar", c: "Alimentación", e: "VPT_SYS|reboot"},
             {n: "Salir a TTY", c: "Alimentación", e: "VPT_SYS|exit_vpt"},
@@ -341,6 +365,9 @@ function executeSmartAction(execString, appName) {
         case "notiftest":
             ntftst()
             break
+        case "vn":
+            versionPopup.open()
+            break
         default:
             // Cualquier otro comando directo (ej: kitty -e nmtui)
             AppBackend.openApp(sysCmd)
@@ -396,77 +423,107 @@ function runManualCommand() {
 
 StyledPopup {
     id: versionPopup
-    width: Math.min(800 * dpScale, parent ? parent.width * 0.95 : 800)
-    height: 550 * dpScale
-    popupRadius: 16 * dpScale
+    objectName: "versionPopup"
+    width: Math.min(800 * dp, parent ? parent.width * 0.95 : 800)
+    height: 550 * dp
+    popupRadius: 16 * dp
     fontType: "body"
+    title: "ATP System Information"  // Se refleja en la propiedad interna del StyledPopup
+
     Shortcut {
-        sequence: "Ctrl + Alt + V"
-        onActivated: {
-            if (!versionPopup.visible) {
-                versionPopup.open();
-            } else {
-                versionPopup.close();
-            }
-        }
+        sequence: "Ctrl+Alt+V"
+        onActivated: versionPopup.visible ? versionPopup.close() : versionPopup.open()
     }
+
+    // El contenido se adapta al padding interno del StyledPopup (24*dp)
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 30 * dpScale
-        spacing: 20 * dpScale
+        spacing: 16 * dp
 
-        // Título del Entorno
+        // Logo centrado (usa el color de acento como fondo sutil)
+        Rectangle {
+            Layout.alignment: Qt.AlignHCenter
+            implicitWidth: 100 * dp
+            implicitHeight: 100 * dp
+            radius: width / 2
+            color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.1)
+            border.color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.3)
+            border.width: 1 * dp
+
+            Image {
+                id: atplogo
+                anchors.centerIn: parent
+                source: "qrc:/image/src/atp-logo.png"
+                sourceSize: Qt.size(64 * dpScale, 64 * dpScale)
+                fillMode: Image.PreserveAspectFit
+            }
+        }
+
+        // Título principal
         Text {
+            Layout.alignment: Qt.AlignHCenter
             text: "ATP System Information"
-            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.monoFontFamily) ?
-                         FontManager.monoFontFamily : "header"
-            font.pixelSize: 22 * dpScale
-            color: "#ffffff"
+            font.family: root.activeFont
+            font.pixelSize: 20 * dp
             font.bold: true
-            Layout.alignment: Qt.AlignHCenter
+            color: versionPopup.accentColor
         }
 
-        // Logo Centrado
-        Image {
-            id: atplogo
-            source: "qrc:/assets/logo_atp.png" // Asegurate de ajustar la ruta a tu archivo
-            sourceSize: Qt.size(120 * dpScale, 120 * dpScale)
-            Layout.alignment: Qt.AlignHCenter
+        // Separador decorativo
+        Rectangle {
+            Layout.fillWidth: true
+            height: 2 * dp
+            color: root.accentColor
+            opacity: 0.3
         }
 
-        // Info Técnica (Grid)
+        // Grid de información dinámica
         GridLayout {
             columns: 2
-            columnSpacing: 20 * dpScale
-            rowSpacing: 10 * dpScale
+            columnSpacing: 16 * dp
+            rowSpacing: 8 * dp
             Layout.alignment: Qt.AlignHCenter
+            Layout.topMargin: 8 * dp
 
             Repeater {
                 model: [
-                    { label: "Version:", value: "26.2.orbit" },
-                    { label: "Kernel:", value: "Linux 6.x (Optimized)" },
-                    { label: "Compiler:", value: "GCC 13.2" },
-                    { label: "Viewport:", value: "v1.0-stable" }
+                    { label: "Version:",    value: "26.2.orbit" },
+                    { label: "Kernel:",     value: "Linux 6.12 LTS" },
+                    { label: "Compiler:",   value: "GCC 13.2" },
+                    { label: "Viewport: (st)",   value: "v1.0-stable" },
+                    { label: "Viewport: (un)",   value: "v1.42-unstable" }
                 ]
                 delegate: RowLayout {
-                    Text { text: modelData.label; color: "#888888"; font.pixelSize: 14 * dpScale }
-                    Text { text: modelData.value; color: "#ffffff"; font.pixelSize: 14 * dpScale; font.bold: true }
+                    Text {
+                        text: modelData.label
+                        color: "#aaaaaa"
+                        font.pixelSize: 14 * dp
+                        font.family: root.activeFont
+                    }
+                    Text {
+                        text: modelData.value
+                        color: "#ffffff"
+                        font.pixelSize: 14 * dp
+                        font.bold: true
+                        font.family: root.activeFont
+                    }
                 }
             }
         }
 
-        // Footer con mensaje de estado
-        Item { Layout.fillHeight: true } // Espaciador flexible
+        // Espaciador flexible (empuja el footer hacia abajo)
+        Item { Layout.fillHeight: true }
 
+        // Footer
         Text {
-            text: "ATP es un entorno modular. Todos los derechos reservados."
-            font.pixelSize: 12 * dpScale
-            color: "#555555"
             Layout.alignment: Qt.AlignHCenter
+            text: "ATP es un entorno modular. Todos los derechos reservados."
+            font.pixelSize: 11 * dp
+            color: "#666666"
+            font.family: root.activeFont
         }
     }
 }
-
 StyledPopup {
     id: terminalPopup
     property string command: ""
@@ -769,7 +826,7 @@ StyledPopup {
   height: 250 * dpScale
   accentColor: "#ff4d4d" // Rojo para advertencia
   popupRadius: 16 * dpScale
-
+  onOpened: AppBackend.playSound("critical.wav")
   ColumnLayout {
       anchors.fill: parent
       anchors.margins: 20 * dpScale
@@ -1014,8 +1071,10 @@ StyledPopup {
             pendingPackagesList = pkgList
             if (count > 0) {
                 showUpdateAvailablePopup(count, pkgList)
+                AppBackend.playSound("subt-ui.wav")
             } else {
                 showInfoPopup("El sistema está actualizado ✓", 2000)
+                sndSubtle.play()
             }
             // Desconectar esta conexión después de usarla
             AppBackend.updatesAvailable.disconnect(updatesConn)
@@ -1334,7 +1393,7 @@ StyledPopup {
   height: 250 * dpScale
   accentColor: "#ff4d4d" // Rojo para advertencia
   popupRadius: 16 * dpScale
-
+  onOpened: AppBackend.playSound("critical.wav")
   ColumnLayout {
       anchors.fill: parent
       anchors.margins: 20 * dpScale
