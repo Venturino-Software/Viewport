@@ -35,7 +35,7 @@ jobs:
         with:
           version: '6.4.2'
           aqtversion: '==3.1.5'
-          modules: 'qt5compat'
+          modules: 'qt5compat qtmultimedia'
 
       - name: Compilar Viewport (appvpt01)
         run: |
