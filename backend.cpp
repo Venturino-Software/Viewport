@@ -294,24 +294,34 @@ void Backend::runCommandWithOutput(const QString &command) {
 }
 
 int Backend::getVolume() {
-    QStringList controls = {"Master", "PCM", "Headphone", "Speaker"};
-    for (const QString &ctrl : controls) {
-        QProcess p;
-        p.start("amixer", {"sget", ctrl});
-        p.waitForFinished(1000);
-        QString out = p.readAllStandardOutput();
-        QRegularExpression re("\\[(\\d+)%\\]");
-        auto match = re.match(out);
-        if (match.hasMatch()) {
-            return match.captured(1).toInt();
-        }
+    QProcess p;
+    // "@DEFAULT_AUDIO_SINK@" apunta automáticamente a la salida activa (auriculares o parlantes)
+    p.start("wpctl", {"get-volume", "@DEFAULT_AUDIO_SINK@"});
+    p.waitForFinished(500);
+
+    QString out = p.readAllStandardOutput().trimmed();
+    // wpctl devuelve algo como: "Volume: 0.65" o "Volume: 0.65 [MUTED]"
+
+    QRegularExpression re("Volume:\\s+([0-9.]+)");
+    auto match = re.match(out);
+    if (match.hasMatch()) {
+        float volFloat = match.captured(1).toFloat();
+        return static_cast<int>(volFloat * 100); // Lo pasamos a rango 0-100
     }
-    qWarning("No se pudo obtener el volumen");
+
+    qWarning() << "[Orbit] No se pudo obtener el volumen de PipeWire, usando fallback 50. Output:" << out;
     return 50;
 }
 
 void Backend::setVolume(int vol) {
-    QProcess::startDetached("amixer", {"sset", "Master", QString::number(vol) + "%"});
+    // wpctl escala de 0.0 a 1.0 (ejemplo: 65% es 0.65)
+    float volFloat = vol / 100.0f;
+
+    // Forzamos un límite para no reventar los parlantes (opcional)
+    if (volFloat > 1.0f) volFloat = 1.0f;
+    if (volFloat < 0.0f) volFloat = 0.0f;
+
+    QProcess::startDetached("wpctl", {"set-volume", "@DEFAULT_AUDIO_SINK@", QString::number(volFloat, 'f', 2)});
 }
 
 void Backend::playTestSound() {

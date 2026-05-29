@@ -140,7 +140,7 @@ public:
             snd_pcm_t *handle = nullptr;
             int err;
 
-            err = snd_pcm_open(&handle, "plug:default", SND_PCM_STREAM_PLAYBACK, 0);
+            err = snd_pcm_open(&handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
             if (err < 0) {
                 qDebug() << "[ALSA] Error al abrir dispositivo:" << snd_strerror(err);
                 return;
@@ -150,7 +150,7 @@ public:
                                      SND_PCM_FORMAT_S16_LE,
                                      SND_PCM_ACCESS_RW_INTERLEAVED,
                                      2,      // canales
-                                     44100,  // frecuencia
+                                     48000,  // frecuencia
                                      1,      // resample software permitido
                                      50000); // latencia 50ms
             if (err < 0) {
@@ -159,6 +159,16 @@ public:
                 return;
             }
 
+            // ... (después de snd_pcm_set_params)
+
+            err = snd_pcm_prepare(handle); // <--- ESTO ES VITAL
+            if (err < 0) {
+                qDebug() << "[ALSA] Error al preparar el dispositivo:" << snd_strerror(err);
+                snd_pcm_close(handle);
+                return;
+            }
+
+            // Ahora sí, escribimos
             snd_pcm_sframes_t frames = snd_pcm_writei(handle, pcmData.constData(), pcmData.size() / bytesPerFrame);
             if (frames < 0) {
                 qDebug() << "[ALSA] Error escribiendo datos:" << snd_strerror(frames);
