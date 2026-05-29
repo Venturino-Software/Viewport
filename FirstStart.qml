@@ -24,6 +24,9 @@ Rectangle {
     readonly property color surfaceDark: "#121418"
     readonly property color surfaceDarker: "#111111"
 
+    // Justo después de las propiedades de color, aproximadamente línea 27
+    property bool closing: false
+
     // ------------------------------------------------------------
     // 1. SISTEMA DE ESCALADO DINÁMICO (DPI / RESOLUCIÓN)
     // ------------------------------------------------------------
@@ -145,6 +148,7 @@ Rectangle {
                 hoverEnabled: true
                 preventStealing: true
                 cursorShape: Qt.PointingHandCursor
+                enabled: !closing
                 onClicked: {
                     welcomeVideo.stop()
                     welcomeRoot.state = "installMode"
@@ -280,6 +284,7 @@ Rectangle {
                         id: cardArea
                         anchors.fill: parent
                         hoverEnabled: true
+                        enabled: !closing
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             if (typeof AppBackend !== "undefined") {
@@ -309,9 +314,10 @@ Rectangle {
     // ------------------------------------------------------------
     // 5. FUNCIÓN FINAL
     // ------------------------------------------------------------
+    // Reemplaza la función finalizeSetup() actual (línea ~212)
     function finalizeSetup() {
-        // Al poner la opacidad en 0, se dispara el 'Behavior on opacity' que armamos arriba.
-        // Cuando termina de hacerse invisible (400ms), se borra todo de la RAM automáticamente.
-        welcomeRoot.opacity = 0
+        if (closing) return;  // Evita múltiples llamadas
+        closing = true;
+        welcomeRoot.opacity = 0;
     }
 }

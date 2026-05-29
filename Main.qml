@@ -420,23 +420,32 @@ StyledPopup {
         // Logo centrado (usa el color de acento como fondo sutil)
         Rectangle {
             Layout.alignment: Qt.AlignHCenter
-            implicitWidth: 100 * dp
-            implicitHeight: 100 * dp
-            radius: width / 2
-            color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.1)
+            implicitWidth: 231
+            implicitHeight: 90
+            color: versionPopup.bgColor
             border.color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.3)
             border.width: 1 * dp
+            clip: true
 
             Image {
                 id: atplogo
+                width: 231            // ← tamaño fijo en dp
+                height: 90
                 anchors.centerIn: parent
-                source: "qrc:/image/src/atp-logo.png"
+                source: "/vpt/bin/src/atp-logo.png"
                 sourceSize: Qt.size(64 * dpScale, 64 * dpScale)
                 fillMode: Image.PreserveAspectFit
             }
         }
+        // Separador decorativo
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 40 * dp   // ← Usa la propiedad del layout
+            color: "transparent"              // Opcional, pero explícito
+            opacity: 0.3
+        }
 
-        // Título principal
+        // Título principal - ¡ELIMINA ESTE BLOQUE COMPLETO!
         Text {
             Layout.alignment: Qt.AlignHCenter
             text: "ATP System Information"
@@ -464,11 +473,11 @@ StyledPopup {
 
             Repeater {
                 model: [
-                    { label: "Version:",    value: "26.2.orbit" },
+                    { label: "Version:",    value: "26.2.1.orbit" },
                     { label: "Kernel:",     value: "Linux 6.12 LTS" },
                     { label: "Compiler:",   value: "GCC 13.2" },
-                    { label: "Viewport: (st)",   value: "v1.0-stable" },
-                    { label: "Viewport: (un)",   value: "v1.42-unstable" }
+                    { label: "Viewport: (st)",   value: "v1.1-stable" },
+                    { label: "Viewport: (un)",   value: "v1.50-unstable" }
                 ]
                 delegate: RowLayout {
                     Text {
@@ -501,6 +510,7 @@ StyledPopup {
         }
     }
 }
+
 StyledPopup {
     id: terminalPopup
     property string command: ""
@@ -528,8 +538,8 @@ StyledPopup {
         // --- CABECERA (ahora con fuente mono) ---
         Text {
             text: "Terminal de Viewport"
-            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.monoFontFamily) ?
-                         FontManager.monoFontFamily : "monospace"
+            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ?
+            FontManager.titleFontFamily : "DejaVu Sans"
             font.pixelSize: 18 * dpScale
             color: "#ffffff"
             font.bold: true
@@ -547,8 +557,8 @@ StyledPopup {
                 id: outputArea
                 readOnly: true
                 color: "#ccddee"
-                font.family: typeof FontManager !== "undefined" && FontManager.monoFontFamily ?
-                             FontManager.monoFontFamily : "Fira Code, monospace"
+                font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.monoFontFamily) ?
+                             FontManager.monoFontFamily : "monospace"
                 font.pixelSize: 13 * dpScale
                 wrapMode: Text.WrapAnywhere
 
@@ -926,7 +936,6 @@ StyledPopup {
             return
         }
 
-        // 🔥 CORREGIDO: buscar "unstable" primero
         let channel = "desconocido"
         if (content.includes("unstable")) {
             channel = "unstable"
@@ -1257,7 +1266,7 @@ StyledPopup {
         })
 
         // Ejecutar actualización
-        AppBackend.runPkexec("apt upgrade -y 2>&1")
+        AppBackend.runPkexec("/usr/bin/apt upgrade -y 2>&1")
 
         // Cuando se cierre el popup, desconectar y reiniciar verificación
         termPopup.onClosed.connect(function() {
@@ -1362,6 +1371,7 @@ StyledPopup {
         }
     }
 }
+
 StyledPopup {
   id: powerWarn
   property string pendingCommand: ""

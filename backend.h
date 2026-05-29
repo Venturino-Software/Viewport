@@ -57,7 +57,7 @@ public:
 
     Q_INVOKABLE void runGenericScript(const QString &scriptPath) {
         // Ejecuta independiente sin congelar la interfaz
-        QProcess::startDetached("/bin/bash", QStringList() << scriptPath);
+        QProcess::startDetached("/usr/bin/pkexec /bin/bash", QStringList() << scriptPath);
     }
 
     Q_INVOKABLE void markSetupAsDone() {
@@ -140,7 +140,7 @@ public:
             snd_pcm_t *handle = nullptr;
             int err;
 
-            err = snd_pcm_open(&handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
+            err = snd_pcm_open(&handle, "plug:default", SND_PCM_STREAM_PLAYBACK, 0);
             if (err < 0) {
                 qDebug() << "[ALSA] Error al abrir dispositivo:" << snd_strerror(err);
                 return;
@@ -171,6 +171,7 @@ public:
             qDebug() << "[ALSA] Reproducción finalizada:" << fullPath;
         });
     }
+
 signals:
     void appClosed();
     void commandOutput(const QString &text);

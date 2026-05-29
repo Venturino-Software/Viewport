@@ -75,16 +75,6 @@ Item {
         commandInput.text = ""; // Limpiar tras enviar
     }
 
-    // --- EFECTO DE SOMBRA ---
-    DropShadow {
-        anchors.fill: pillBackground
-        source: pillBackground
-        color: "#60000000" // Sombra oscura para darle profundidad
-        horizontalOffset: 0
-        verticalOffset: 8 * dpScale
-        radius: 16 * dpScale
-        samples: 33
-    }
 
     // --- FONDO DE LA PILL ---
     Rectangle {
@@ -143,13 +133,6 @@ Item {
                         border.color: rootPill.accentColor
                         border.width: 1 * dpScale
                     }
-                }
-                DropShadow {
-                    anchors.fill: parent
-                    source: parent
-                    color: "#80000000"
-                    radius: 10
-                    samples: 21
                 }
 
                 delegate: ItemDelegate {
