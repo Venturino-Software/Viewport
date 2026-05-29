@@ -1,9 +1,10 @@
-name: Generar Paquete DEB (>unstable)
+name: Generar Paquete DEB y Publicar APT
 
 on:
   push:
     branches:
-      - "main" # Se ejecuta solo cuando lanzas algo definitivo a main
+      - "main"    # → unstable
+      - "stable"  # → stable
 
 permissions:
   contents: write
@@ -12,6 +13,11 @@ jobs:
   deploy-apt-repo:
     runs-on: ubuntu-22.04
 
+    env:
+      # Codename según la rama
+      CODENAME: ${{ github.ref_name == 'main' && 'unstable' || github.ref_name }}
+      DEB_SUFFIX: ${{ github.ref_name == 'main' && 'unstable' || 'stable' }}
+
     steps:
       - name: Descargar código fuente
         uses: actions/checkout@v4
@@ -19,7 +25,6 @@ jobs:
       - name: Instalar dependencias del sistema
         run: |
           sudo apt-get update
-          # Agregamos reprepro a esta lista:
           sudo apt-get install -y build-essential cmake ninja-build \
                                   libgl1-mesa-dev libxkbcommon-dev \
                                   libvulkan-dev libdbus-1-dev reprepro libasound2-dev
@@ -31,13 +36,10 @@ jobs:
           version: '6.4.2'
           aqtversion: '==3.1.5'
           modules: 'qt5compat'
-          
+
       - name: Compilar Viewport (appvpt01)
         run: |
-          # Aquí le decimos a CMake: "busca Qt en la ruta que guardó el paso 'qt'"
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${{ steps.qt.outputs.qt_prefix }}
-          
-          # Compila el binario
           cmake --build build
 
       - name: Crear y empaquetar .deb
@@ -45,9 +47,7 @@ jobs:
           mkdir -p debian_package/vpt/bin
           mkdir -p debian_package/DEBIAN
 
-          # NEW: for ATP
           cp build/appvpt01 debian_package/vpt/bin/viewport
-          # ¡Copiar los archivos QML!
           cp Main.qml debian_package/vpt/bin/
           cp StyledPopup.qml debian_package/vpt/bin/
           cp StyledButton.qml debian_package/vpt/bin/
@@ -58,13 +58,10 @@ jobs:
           cp FirstStart.qml debian_package/vpt/bin/
           cp CommandPill.qml debian_package/vpt/bin/
           cp azaretmono.ttf debian_package/vpt/bin/
-
           cp -r src debian_package/vpt/bin/
-          
-          # Si no hay etiqueta, usamos el número de ejecución
+
           VERSION="1.0.${{ github.run_number }}"
-          
-          # Usamos cat sin comillas en EOF para que se expandan las variables
+
           cat <<EOF > debian_package/DEBIAN/control
           Package: viewport
           Version: $VERSION
@@ -76,65 +73,70 @@ jobs:
           Recommends: fonts-nunito
           Description: Entorno grafico ultraligero y ultracustomizable.
           EOF
-          
-          # Construimos y movemos inmediatamente a /tmp (ruta absoluta, segura)
-          dpkg-deb --build debian_package viewport_unstable.deb
-          mv viewport_unstable.deb /tmp/viewport.deb
 
-      - name: Configurar, firmar y publicar repositorio APT
+          dpkg-deb --build debian_package viewport_${DEB_SUFFIX}.deb
+          mv viewport_${DEB_SUFFIX}.deb /tmp/viewport.deb
+
+      - name: Configurar, firmar y publicar repositorio APT (convivencia)
         run: |
-          # Preparar rama gh-pages
           git fetch origin
           git checkout gh-pages || git checkout --orphan gh-pages
 
-          # Limpiar todo el contenido excepto .git para evitar borrar el repositorio
-          find . -mindepth 1 -maxdepth 1 -not -name '.git' -exec rm -rf {} \;
-          rm -rf /tmp/reprepro_temp
+          # No limpiamos el directorio: así mantenemos ambos codenames
           mkdir -p conf
 
-          # Configuración de reprepro
+          # Definimos ambos componentes en la configuración de reprepro
           cat <<EOF > conf/distributions
           Origin: Viewport Repository
-          Label: Viewport APT
+          Label: Viewport Unstable
           Codename: unstable
+          Suite: unstable
           Architectures: amd64
           Components: main
           Description: Repositorio inestable para Viewport
+
+          Origin: Viewport Repository
+          Label: Viewport Stable
+          Codename: stable
+          Suite: stable
+          Architectures: amd64
+          Components: main
+          Description: Repositorio estable para Viewport
           EOF
 
-          # Construir el índice del repositorio
-          reprepro -b . clearvanished
-          reprepro -b . includedeb unstable /tmp/viewport.deb
+          # Añadimos el paquete al codename actual
+          reprepro -b . includedeb ${CODENAME} /tmp/viewport.deb
+
+          # Exportamos índices y limpiamos huérfanos
           reprepro -b . export
+          reprepro -b . clearvanished
           reprepro -b . createsymlinks
 
-          # Verificar hash de Packages.gz y reexportar si es necesario
-          cd dists/unstable
+          # Verificamos y corregimos el hash de Packages.gz si es necesario
+          cd dists/${CODENAME}
           md5sum main/binary-amd64/Packages.gz > /tmp/check_md5
           if ! grep -q "$(cat /tmp/check_md5)" Release; then
-            echo "⚠️ Regenerando Release manualmente"
+            echo "⚠️ Regenerando Release manualmente para ${CODENAME}"
             cd ../..
             reprepro -b . export
           else
             cd ../..
           fi
 
-          # --- Importar clave GPG y firmar Release ---
+          # Importamos la clave GPG y firmamos el Release del codename actual
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
-
-          # Pasar la passphrase por stdin (más seguro)
           echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --pinentry-mode loopback \
             --passphrase-fd 0 \
             --detach-sign --armor \
-            --output dists/unstable/Release.gpg \
-              dists/unstable/Release
+            --output dists/${CODENAME}/Release.gpg \
+              dists/${CODENAME}/Release
 
+          # Exportamos la clave pública y aseguramos el CNAME
           gpg --armor --export > publickey.asc
-          # ------------------------------------------------
-
           echo "vpt.soyss.cc" > CNAME
+
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action Bot"
           git add --all
-          git commit -m "🔧 APT: v${{ github.run_number }} (firmado)"
+          git commit -m "🔧 APT ${CODENAME}: v${{ github.run_number }} (firmado)"
           git push origin gh-pages --force
