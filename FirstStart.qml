@@ -11,12 +11,15 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtMultimedia 5.15
+import QtQuick.Controls.Material 2.15
 
 Rectangle {
     id: welcomeRoot
     anchors.fill: parent
     color: "#050505"
     z: 99999
+    Material.theme: Material.Dark
+    Material.accent: Material.Indigo
 
     // === PALETA DE COLORES UNIFICADA ===
     readonly property color accentColor: "#7f99ff"
@@ -28,6 +31,9 @@ Rectangle {
     property string selectedChannel: ""
     readonly property string sourcesListPath: "/etc/apt/sources.list.d/viewport.list"
 
+    // Variable para controlar la página actual del OOBE (0 a 3)
+    property int currentPage: 0
+
     // ------------------------------------------------------------
     // 1. SISTEMA DE ESCALADO DINÁMICO
     // ------------------------------------------------------------
@@ -36,10 +42,6 @@ Rectangle {
     readonly property real dp: scaleFactor
     readonly property real baseFontSize: 16
     readonly property real titleFontSize: baseFontSize * dp * 2.2
-
-    // Dimensiones de los paneles de configuración
-    readonly property real panelWidth: 420 * dp
-    readonly property real panelHeight: 520 * dp
 
     states: [
         State {
@@ -70,6 +72,8 @@ Rectangle {
     }
 
     function readChannelAndInit() {
+        if (typeof AppBackend === "undefined") return;
+
         let content = AppBackend.readFile(sourcesListPath)
         console.log("=== readChannelAndInit ===")
         console.log("Contenido CRUDO del archivo:", JSON.stringify(content))
@@ -86,7 +90,6 @@ Rectangle {
 
         if (selectedChannel !== "" && selectedChannel !== "desconocido") {
             checkForUpdates()
-
         }
     }
 
@@ -117,7 +120,6 @@ Rectangle {
         }
     }
 
-    // Inicialización del Volumen desde C++ al cargar
     Component.onCompleted: {
         if (typeof AppBackend !== "undefined") {
             volumeSlider.value = AppBackend.getVolume()
@@ -126,7 +128,7 @@ Rectangle {
     }
 
     // ------------------------------------------------------------
-    // ETAPA 1: VÍDEO DE FONDO Y BIENVENIDA
+    // ETAPA 1: VÍDEO DE FONDO Y BIENVENIDA (Mantenido intacto)
     // ------------------------------------------------------------
     Item {
         id: videoStage
@@ -186,79 +188,124 @@ Rectangle {
     }
 
     // ------------------------------------------------------------
-    // ETAPA 2: CENTRAL DE CONFIGURACIÓN (DASHBOARD)
+    // ETAPA 2: CENTRAL DE CONFIGURACIÓN (DASHBOARD TIPO OOBE WIN11)
     // ------------------------------------------------------------
     Item {
         id: configStage
         anchors.fill: parent
         opacity: 0
 
+        // Fondo oscuro para resaltar la tarjeta central
         Rectangle {
             anchors.fill: parent
             color: "#0b0c10"
         }
 
-        Text {
-            id: titleText
-            text: "Ajustes Iniciales del Entorno"
-            color: "#ffffff"
-            font.pixelSize: titleFontSize
-            font.bold: true
-            anchors.top: parent.top
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.topMargin: 60 * dp
-        }
-
-        // GRID DE CONFIGURACIONES TRIPLE
-        Row {
-            spacing: 40 * dp
+        // Tarjeta Central (70% de la pantalla)
+        Rectangle {
+            id: oobeCard
+            width: parent.width * 0.70
+            height: parent.height * 0.70
             anchors.centerIn: parent
-            anchors.verticalCenterOffset: 30 * dp
+            radius: 24 * dp
+            color: surfaceDark
+            border.color: "#2a2d35"
+            border.width: 1 * dp
 
-            // --- PANEL 1: PANTALLA Y ENTORNO ---
-            Rectangle {
-                width: panelWidth; height: panelHeight
-                radius: 16 * dp
-                color: surfaceDark
-                border.color: "#2a2d35"; border.width: 1 * dp
+            // --- CONTENEDOR DE PÁGINAS ---
+            Item {
+                anchors.fill: parent
+                anchors.margins: 60 * dp // Magnitud generosa solicitada
+                anchors.bottomMargin: 100 * dp // Espacio extra para el footer de navegación
 
+                // ==========================================
+                // PÁGINA 1: PANTALLA Y ENTORNO
+                // ==========================================
                 Column {
-                    anchors.fill: parent; anchors.margins: 24 * dp
-                    spacing: 20 * dp
+                    anchors.fill: parent
+                    spacing: 30 * dp
+                    visible: currentPage === 0
 
-                    Text { text: "🖥️ Monitor & DPI"; color: "white"; font.pixelSize: baseFontSize * dp * 1.3; font.bold: true }
-
-                    // Input Dispositivo
-                    Column {
-                        spacing: 6 * dp; width: parent.width
-                        Text { text: "Dispositivo de Display:"; color: "#95a5a6"; font.pixelSize: baseFontSize * dp * 0.9 }
-                        TextField {
-                            id: displayInput
-                            width: parent.width; height: 40 * dp
-                            text: "eDP-1"
-                            color: "white"
-                            background: Rectangle { color: surfaceDarker; radius: 6 * dp; border.color: parent.activeFocus ? welcomeRoot.accentColor : "#333" }
-                        }
+                    Text {
+                        text: "Configuración de Pantalla"
+                        color: "white"
+                        font.pixelSize: titleFontSize
+                        font.bold: true
                     }
 
-                    // Slider Escala
-                    Column {
-                        spacing: 6 * dp; width: parent.width
-                        Text { text: `Escala de Renderizado: ${scaleSlider.value.toFixed(2)}`; color: "#95a5a6"; font.pixelSize: baseFontSize * dp * 0.9 }
-                        Slider {
-                            id: scaleSlider
-                            width: parent.width; from: 1.0; to: 2.5; value: 1.0
-                        }
+                    Text {
+                        text: "Ajusta la resolución y la escala para que la interfaz se adapte perfectamente a tu monitor."
+                        color: "#95a5a6"
+                        font.pixelSize: baseFontSize * dp * 1.1
+                        wrapMode: Text.WordWrap
+                        width: parent.width
                     }
 
-                    // Tasa de Refresco
-                    Column {
-                        spacing: 6 * dp; width: parent.width
-                        Text { text: "Tasa de Refresco (Hz):"; color: "#95a5a6"; font.pixelSize: baseFontSize * dp * 0.9 }
-                        ComboBox {
-                            id: hzInput
-                            width: parent.width; height: 40 * dp
-                            model: ["60", "75", "124", "144", "240"]
+                    Grid {
+                        columns: 2
+                        spacing: 40 * dp
+                        width: parent.width
+
+                        // Columna Izquierda
+                        Column {
+                            spacing: 20 * dp
+                            width: (parent.width - 40 * dp) / 2
+
+                            Column {
+                                spacing: 8 * dp; width: parent.width
+                                Text { text: "Dispositivo de Display:"; color: "#95a5a6"; font.pixelSize: baseFontSize * dp }
+                                TextField {
+                                    id: displayInput
+                                    width: parent.width; height: 60 * dp
+                                    text: "eDP-1"
+                                    color: "white"
+                                    background: Rectangle { color: surfaceDarker; radius: 8 * dp; border.color: parent.activeFocus ? welcomeRoot.accentColor : "#333" }
+                                }
+                            }
+
+                            Column {
+                                spacing: 14 * dp; width: parent.width
+                                Text { text: `Escala de Renderizado: ${scaleSlider.value.toFixed(2)}`; color: "#95a5a6"; font.pixelSize: baseFontSize * dp }
+                                Slider {
+                                    id: scaleSlider
+                                    width: parent.width; from: 1.0; to: 2.5; value: 1.0
+                                }
+                            }
+                        }
+
+                        // Columna Derecha
+                        Column {
+                            spacing: 20 * dp
+                            width: (parent.width - 40 * dp) / 2
+
+                            Column {
+                                spacing: 8 * dp; width: parent.width
+                                Text { text: "Tasa de Refresco (Hz):"; color: "#95a5a6"; font.pixelSize: baseFontSize * dp }
+                                ComboBox {
+                                    id: hzInput
+                                    width: parent.width; height: 60 * dp
+                                    model: ["24", "30", "42", "60", "75", "124", "144", "240", "360", "520"]
+                                }
+                            }
+
+                            Column {
+                                spacing: 8 * dp; width: parent.width
+                                Text { text: "Resolución:"; color: "#95a5a6"; font.pixelSize: baseFontSize * dp }
+                                ComboBox {
+                                    id: resInput
+                                    width: parent.width; height: 60 * dp
+                                    textRole: "text"
+                                    valueRole: "value"
+                                    model: [
+                                        { text: "4K (3840x2160)",  value: "3840x2160" },
+                                        { text: "QHD (2560x1440)",  value: "2560x1440" },
+                                        { text: "FHD (1920x1080)",     value: "1920x1080" },
+                                        { text: "HD (1280x720)",           value: "1280x720" },
+                                        { text: "SD 16:9 (854x480)", value: "854x480" },
+                                        { text: "SD (640x360)",            value: "640x360" }
+                                    ]
+                                }
+                            }
                         }
                     }
 
@@ -266,46 +313,54 @@ Rectangle {
 
                     StyledButton {
                         text: "Aplicar Pantalla"
-                        width: parent.width
-                        buttonColor: welcomeRoot.accentColor
-                        textColor: "#000000"
+                        width: 250 * dp
+                        buttonColor: surfaceColor
+                        textColor: welcomeRoot.accentColor
                         animationId: 1
                         onClicked: {
-                            let cmd = `wlr-randr --output ${displayInput.text} --scale ${scaleSlider.value.toFixed(2)} --mode ${hzInput.currentText}Hz`
+                            let resolucion = resInput.currentValue
+                            let hz = hzInput.currentText
+                            let cmd = `wlr-randr --output ${displayInput.text} --scale ${scaleSlider.value.toFixed(2)} --mode ${resolucion}@${hz}Hz`
                             if (typeof AppBackend !== "undefined") AppBackend.runPkexec(cmd)
                             console.log("Ejecutando escalado:", cmd)
                         }
                     }
                 }
-            }
 
-            // --- PANEL 2: CONFIGURACIÓN DE AUDIO ---
-            Rectangle {
-                width: panelWidth; height: panelHeight
-                radius: 16 * dp
-                color: surfaceDark
-                border.color: "#2a2d35"; border.width: 1 * dp
-
+                // ==========================================
+                // PÁGINA 2: CONFIGURACIÓN DE AUDIO
+                // ==========================================
                 Column {
-                    anchors.fill: parent; anchors.margins: 24 * dp
-                    spacing: 24 * dp
+                    anchors.centerIn: parent
+                    width: parent.width * 0.8
+                    spacing: 40 * dp
+                    visible: currentPage === 1
 
-                    Text { text: "Sistema de Audio"; color: "white"; font.pixelSize: baseFontSize * dp * 1.3; font.bold: true }
                     Text {
-                        text: "Configura el volumen maestro inicial del servidor de audio PipeWire de forma directa."
-                        color: "#95a5a6"; font.pixelSize: baseFontSize * dp * 0.95; wrapMode: Text.WordWrap; width: parent.width
+                        text: "Sistema de Audio"
+                        color: "white"
+                        font.pixelSize: titleFontSize
+                        font.bold: true
+                        anchors.horizontalCenter: parent.horizontalCenter
                     }
 
-                    Item { width: 1; height: 20 * dp }
+                    Text {
+                        text: "Configura el volumen maestro inicial del servidor de audio PipeWire. Puedes probar el sonido antes de continuar."
+                        color: "#95a5a6"
+                        font.pixelSize: baseFontSize * dp * 1.1
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignHCenter
+                        width: parent.width
+                    }
 
-                    // Slider de Volumen Inteligente
                     Column {
-                        spacing: 12 * dp; width: parent.width
-                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 20 * dp; width: parent.width
 
                         Text {
                             text: `Volumen General: ${Math.round(volumeSlider.value)}%`
-                            color: "white"; font.pixelSize: baseFontSize * dp * 1.1; font.bold: true
+                            color: "white"
+                            font.pixelSize: baseFontSize * dp * 1.4
+                            font.bold: true
                             anchors.horizontalCenter: parent.horizontalCenter
                         }
 
@@ -321,11 +376,10 @@ Rectangle {
                         }
                     }
 
-                    Item { width: 1; height: 30 * dp }
-
                     StyledButton {
                         text: "Probar Sonido"
-                        width: parent.width
+                        width: 250 * dp
+                        anchors.horizontalCenter: parent.horizontalCenter
                         buttonColor: surfaceColor
                         animationId: 2
                         onClicked: {
@@ -333,67 +387,151 @@ Rectangle {
                         }
                     }
                 }
-            }
 
-            // --- PANEL 3: CANAL DE DISTRIBUCIÓN ---
-            Rectangle {
-                width: panelWidth; height: panelHeight
-                radius: 16 * dp
-                color: surfaceDark
-                border.color: "#2a2d35"; border.width: 1 * dp
-
+                // ==========================================
+                // PÁGINA 3: CANAL DE PAQUETES
+                // ==========================================
                 Column {
-                    anchors.fill: parent; anchors.margins: 24 * dp
-                    spacing: 16 * dp
+                    anchors.centerIn: parent
+                    width: parent.width * 0.8
+                    spacing: 40 * dp
+                    visible: currentPage === 2
 
-                    Text { text: "Rama de Software"; color: "white"; font.pixelSize: baseFontSize * dp * 1.3; font.bold: true }
                     Text {
-                        text: "Selecciona el origen de los paquetes de actualización APT para Viewport OS."
-                        color: "#95a5a6"; font.pixelSize: baseFontSize * dp * 0.95; wrapMode: Text.WordWrap; width: parent.width
+                        text: "Rama de Software"
+                        color: "white"
+                        font.pixelSize: titleFontSize
+                        font.bold: true
+                        anchors.horizontalCenter: parent.horizontalCenter
                     }
 
-                    Item { width: 1; height: 10 * dp }
+                    Text {
+                        text: "Selecciona el origen de los paquetes de actualización APT para Viewport OS. Puedes elegir la estabilidad absoluta o lo último en características."
+                        color: "#95a5a6"
+                        font.pixelSize: baseFontSize * dp * 1.1
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignHCenter
+                        width: parent.width
+                    }
+
+                    Row {
+                        spacing: 30 * dp
+                        anchors.horizontalCenter: parent.horizontalCenter
+
+                        StyledButton {
+                            text: "Rama Unstable"
+                            width: 220 * dp
+                            height: 80 * dp
+                            buttonColor: selectedChannel === "unstable" ? welcomeRoot.accentColor : surfaceColor
+                            textColor: selectedChannel === "unstable" ? "#000" : "#fff"
+                            onClicked: configureChannel("unstable")
+                        }
+
+                        StyledButton {
+                            text: "Rama Estable"
+                            width: 220 * dp
+                            height: 80 * dp
+                            buttonColor: selectedChannel === "stable" ? welcomeRoot.accentColor : surfaceColor
+                            textColor: selectedChannel === "stable" ? "#000" : "#fff"
+                            onClicked: configureChannel("stable")
+                        }
+                    }
+                }
+
+                // ==========================================
+                // PÁGINA 4: FINALIZACIÓN
+                // ==========================================
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 50 * dp
+                    visible: currentPage === 3
+
+                    AnimatedImage {
+                        id: finishAnim
+                        source: "file:///vpt/bin/src/finish.gif"
+                        width: 250 * dp
+                        height: 250 * dp
+                        anchors.horizontalCenter: parent.horizontalCenter
+
+                        // Controlamos el estado inicial: solo juega si estamos en la pagina 3
+                        playing: currentPage === 3
+
+                        onCurrentFrameChanged: {
+                            // frameCount es el total de cuadros del GIF
+                            // currentFrame es el cuadro actual (base 0)
+                            if (playing && currentFrame === frameCount - 1) {
+                                playing = false
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: "Viewport se configuro correctamente"
+                        color: "white"
+                        font.pixelSize: titleFontSize
+                        font.bold: true
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
 
                     StyledButton {
-                        text: "Rama Unstable"
-                        width: parent.width
-                        buttonColor: selectedChannel === "unstable" ? welcomeRoot.accentColor : surfaceColor
-                        textColor: selectedChannel === "unstable" ? "#000" : "#fff"
-                        onClicked: configureChannel("unstable")
-                    }
-                    // Selector de canales utilizando StyledButton
-                    StyledButton {
-                        text: "Rama Estable"
-                        width: parent.width
-                        buttonColor: selectedChannel === "stable" ? welcomeRoot.accentColor : surfaceColor
-                        textColor: selectedChannel === "stable" ? "#000" : "#fff"
-                        onClicked: configureChannel("stable")
+                        text: "Listo"
+                        width: 280 * dp
+                        height: 70 * dp
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        buttonColor: welcomeRoot.accentColor
+                        textColor: "#000"
+                        animationId: 2
+                        onClicked: {
+                            if (!closing) {
+                                closing = true;
+                                welcomeRoot.opacity = 0;
+                            }
+                        }
                     }
                 }
             }
-        }
 
-        // BOTÓN INFERIOR DE FINALIZACIÓN
-        StyledButton {
-            text: "FINALIZAR SETUP"
-            anchors.bottom: parent.bottom
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottomMargin: 40 * dp
-            width: 280 * dp
-            buttonColor: "#27ae60"
-            textColor: "white"
-            animationId: 2
-            onClicked: {
-                if (!closing) {
-                    closing = true;
-                    welcomeRoot.opacity = 0;
+            // --- NAVEGACIÓN INFERIOR (FOOTER) ---
+            Item {
+                id: navigationFooter
+                height: 80 * dp
+                anchors.bottom: parent.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: 40 * dp
+                // Ocultar el footer en la página 4 (Finalización) ya que tiene su propio botón "Listo"
+                visible: currentPage < 3
+
+                StyledButton {
+                    text: "Atrás"
+                    width: 160 * dp
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    buttonColor: "transparent"
+                    textColor: "#95a5a6"
+                    visible: currentPage > 0
+                    onClicked: currentPage--
+                }
+
+                StyledButton {
+                    text: "Siguiente"
+                    width: 180 * dp
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    buttonColor: welcomeRoot.accentColor
+                    textColor: "#000"
+                    onClicked: {
+                        if (currentPage < 3) {
+                            currentPage++
+                        }
+                    }
                 }
             }
         }
     }
 
     // ------------------------------------------------------------
-    // NOTIFICACIÓN POPUP (Basado en tu StyledPopup)
+    // NOTIFICACIÓN POPUP
     // ------------------------------------------------------------
     StyledPopup {
         id: popupNotification
