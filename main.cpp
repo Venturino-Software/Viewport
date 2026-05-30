@@ -13,16 +13,28 @@
 #include <QQmlContext>
 #include <QIcon>
 #include <QDir>
+#include <QPalette>
 #include "backend.h"
 #include "iconprovider.h"
 
 int main(int argc, char *argv[])
 {
+    qputenv("QT_QUICK_CONTROLS_STYLE", "Fusion");
     qputenv("QT_QPA_PLATFORM", "wayland");
     qputenv("QT_WAYLAND_FORCE_DPI", "physical");
     qputenv("QT_SCALE_FACTOR", "1.65");
 
     QGuiApplication app(argc, argv);
+
+    QPalette darkPalette;
+    darkPalette.setColor(QPalette::Window, QColor("#2D2D2D"));
+    darkPalette.setColor(QPalette::WindowText, Qt::white);
+    darkPalette.setColor(QPalette::Base, QColor("#3D3D3D"));
+    darkPalette.setColor(QPalette::AlternateBase, QColor("#2D2D2D"));
+    darkPalette.setColor(QPalette::Text, Qt::white);
+    darkPalette.setColor(QPalette::Button, QColor("#3D3D3D"));
+    darkPalette.setColor(QPalette::ButtonText, Qt::white);
+    app.setPalette(darkPalette);
 
     // 1. Rutas de iconos
     QStringList iconPaths;
@@ -33,26 +45,12 @@ int main(int argc, char *argv[])
     QIcon::setThemeName("Yaru");
     QIcon::setFallbackThemeName("hicolor");
     Backend appBackend;
-    QDir vptDir("/vpt");
-    if (!vptDir.exists()) {
-        qWarning() << "/vpt no existe, creando...";
-        QDir().mkpath("/vpt/etc/sounds");
-        QDir().mkpath("/vpt/share/media");
-        QDir().mkpath("/vpt/adm/bin");
-    }
-    QString testWav = "/vpt/etc/sounds/test.wav";
-    if (!QFile::exists(testWav)) {
-        qWarning() << testWav << "no existe, creando dummy...";
-        QFile file(testWav);
-        if (file.open(QIODevice::WriteOnly)) {
-            file.close();
-        }
-    }
-    QString videoPath = "/vpt/share/media/helloworld.mp4";
+    QString testWav = "/vpt/pop.wav";
+    QString videoPath = "/vpt/bin/media/helloworld.mp4";
     if (!QFile::exists(videoPath)) {
         qWarning() << videoPath << "no existe!";
         // Crear directorio si no existe
-        QDir().mkpath("/vpt/share/media");
+        QDir().mkpath("/vpt/bin/media");
     }
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("AppBackend", &appBackend);

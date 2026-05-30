@@ -14,6 +14,7 @@ import QtQuick.Layouts
 import QtQuick.Shapes
 import Qt5Compat.GraphicalEffects
 import QtMultimedia
+import QtQuick.Controls.Material 2.15 // Importá esto
 
 Window {
 id: root
@@ -23,6 +24,9 @@ height: Math.max(650, Screen.desktopAvailableHeight * 0.8)
 visible: true
 title: qsTr("Viewport Launcher")
 color: "#05050a"  // BGCOLOR
+
+Material.theme: Material.Dark
+Material.accent: Material.Indigo
 
 function forceOobeRestart() {
         console.log("[VPT] Función puente activada. Despertando Loader...")
