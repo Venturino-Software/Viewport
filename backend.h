@@ -82,6 +82,12 @@ public:
 
     Q_INVOKABLE void runCommandWithSudo(const QString &command, const QString &password, QJSValue callback = QJSValue());
 
+    Q_INVOKABLE void runCommand(const QString &cmd) {
+        // Ejecuta el comando en un hilo separado de forma asíncrona
+        // para que la interfaz QML no se congele mientras cambia la resolución
+        QProcess::startDetached("/bin/sh", QStringList() << "-c" << cmd);
+    }
+
     Q_INVOKABLE void runPkexec(const QString &command);
     Q_INVOKABLE void checkForUpdates(); // combina apt update + análisis
     Q_INVOKABLE void playSound(const QString &fileName)
