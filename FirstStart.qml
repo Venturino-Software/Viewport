@@ -320,7 +320,7 @@ Rectangle {
                         onClicked: {
                             let resolucion = resInput.currentValue
                             let hz = hzInput.currentText
-                            let cmd = `wlr-randr --output ${displayInput.text} --scale ${scaleSlider.value.toFixed(2)} --mode ${resolucion}@${hz}Hz`
+                            let cmd = `wlr-randr --output ${displayInput.text} --scale ${scaleSlider.value.toFixed(2)} --custom-mode ${resolucion}@${hz}Hz`
                             if (typeof AppBackend !== "undefined") AppBackend.runCommand(cmd)
                             console.log("Ejecutando escalado:", cmd)
                         }
