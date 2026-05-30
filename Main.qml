@@ -477,11 +477,11 @@ StyledPopup {
 
             Repeater {
                 model: [
-                    { label: "Version:",    value: "26.2.1.orbit" },
+                    { label: "Version:",    value: "26.2.2.orbit" },
                     { label: "Kernel:",     value: "Linux 6.12 LTS" },
                     { label: "Compiler:",   value: "GCC 13.2" },
                     { label: "Viewport: (st)",   value: "v1.1-stable" },
-                    { label: "Viewport: (un)",   value: "v1.50-unstable" }
+                    { label: "Viewport: (un)",   value: "v1.54-unstable" }
                 ]
                 delegate: RowLayout {
                     Text {

@@ -6,6 +6,8 @@
  * bajo los términos de la Licencia Pública General de GNU según es publicada
  * por la Free Software Foundation, ya sea la versión 3 de la Licencia,
  * o (a tu elección) cualquier versión posterior.
+ *
+ * lib-vptcomponents
  */
 
 import QtQuick 2.15
@@ -101,7 +103,6 @@ Popup {
             border.color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.2)
             clip: true // Evita que los elementos internos salgan de las curvas
 
-            // Reemplaza tu bloque "gradient: LinearGradient { ... }" por esto:
 gradient: Gradient {
     orientation: Gradient.Vertical
     GradientStop { position: 0.0; color: Qt.lighter(root.bgColor, 1.1) }
