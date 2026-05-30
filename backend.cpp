@@ -19,6 +19,144 @@ Backend::~Backend() {
         m_currentProcess->waitForFinished(1000);
     }
 }
+QStringList Backend::getAvailableRefreshRates(const QString &outputName) {
+    QStringList rates;
+    if (outputName.isEmpty()) return rates;
+
+    QProcess proc;
+    proc.start("wlr-randr");
+    if (!proc.waitForFinished()) return rates;
+
+    QString output = QString::fromLocal8Bit(proc.readAllStandardOutput());
+    QStringList lines = output.split("\n");
+
+    bool targetOutputFound = false;
+    // Expresión regular para capturar los Hz (acepta decimales enteros)
+    QRegularExpression hzRegex("(\\d+(?:\\.\\d+)?)\\s+Hz");
+
+    for (const QString &line : lines) {
+        // Detectamos si empieza la sección de la pantalla que nos interesa
+        if (line.startsWith(outputName)) {
+            targetOutputFound = true;
+            continue;
+        }
+        // Si empieza otra sección de pantalla, dejamos de leer
+        if (targetOutputFound && !line.startsWith(" ") && !line.isEmpty()) {
+            break;
+        }
+
+        if (targetOutputFound) {
+            QRegularExpressionMatch match = hzRegex.match(line);
+            if (match.hasMatch()) {
+                float hzFloat = match.captured(1).toFloat();
+                // Redondeamos para quitar los molestos .001000 de Wayland
+                QString hzStr = QString::number(qRound(hzFloat));
+                if (!rates.contains(hzStr)) {
+                    rates.append(hzStr);
+                }
+            }
+        }
+    }
+    return rates;
+}
+QStringList Backend::getAvailableResolutions(const QString &outputName) {
+    QStringList resList;
+    if (outputName.isEmpty()) return resList;
+
+    QProcess proc;
+    proc.start("wlr-randr");
+    if (!proc.waitForFinished()) return resList;
+
+    QString output = QString::fromLocal8Bit(proc.readAllStandardOutput());
+    QStringList lines = output.split("\n");
+
+    bool targetOutputFound = false;
+    // Captura formatos tipo "1920x1080"
+    QRegularExpression resRegex("(\\d+x\\d+)\\s+px");
+
+    for (const QString &line : lines) {
+        if (line.startsWith(outputName)) {
+            targetOutputFound = true;
+            continue;
+        }
+        if (targetOutputFound && !line.startsWith(" ") && !line.isEmpty()) break;
+
+        if (targetOutputFound) {
+            QRegularExpressionMatch match = resRegex.match(line);
+            if (match.hasMatch()) {
+                QString resStr = match.captured(1);
+                if (!resList.contains(resStr)) resList.append(resStr);
+            }
+        }
+    }
+    return resList;
+}
+
+QString Backend::getCurrentResolution(const QString &outputName) {
+    if (outputName.isEmpty()) return "1920x1080"; // Fallback seguro
+
+    QProcess proc;
+    proc.start("wlr-randr");
+    if (!proc.waitForFinished()) return "1920x1080";
+
+    QString output = QString::fromLocal8Bit(proc.readAllStandardOutput());
+    QStringList lines = output.split("\n");
+
+    bool targetOutputFound = false;
+    QRegularExpression resRegex("(\\d+x\\d+)\\s+px");
+
+    for (const QString &line : lines) {
+        if (line.startsWith(outputName)) {
+            targetOutputFound = true;
+            continue;
+        }
+        if (targetOutputFound && !line.startsWith(" ") && !line.isEmpty()) {
+            break; // Pasamos a otra pantalla, salimos
+        }
+
+        // Si es nuestra pantalla y es la resolución activa actual
+        if (targetOutputFound && line.contains("current")) {
+            QRegularExpressionMatch match = resRegex.match(line);
+            if (match.hasMatch()) {
+                return match.captured(1); // Devuelve "1920x1080"
+            }
+        }
+    }
+    return "1920x1080";
+}
+QString Backend::getCurrentRefreshRate(const QString &outputName) {
+    if (outputName.isEmpty()) return "60"; // Valor seguro por defecto
+
+    QProcess proc;
+    proc.start("wlr-randr");
+    if (!proc.waitForFinished()) return "60";
+
+    QString output = QString::fromLocal8Bit(proc.readAllStandardOutput());
+    QStringList lines = output.split("\n");
+
+    bool targetOutputFound = false;
+    QRegularExpression hzRegex("(\\d+(?:\\.\\d+)?)\\s+Hz.*current");
+
+    for (const QString &line : lines) {
+        if (line.startsWith(outputName)) {
+            targetOutputFound = true;
+            continue;
+        }
+        if (targetOutputFound && !line.startsWith(" ") && !line.isEmpty()) {
+            break;
+        }
+
+        if (targetOutputFound && line.contains("current")) {
+            QRegularExpressionMatch match = hzRegex.match(line);
+            if (match.hasMatch()) {
+                float hzFloat = match.captured(1).toFloat();
+                return QString::number(qRound(hzFloat));
+            }
+        }
+    }
+    return "60";
+}
+
 /*
 QVariantList Backend::loadDesktopApps() {
     QVariantList apps;
@@ -261,7 +399,14 @@ void Backend::openApp(const QString &execCommand) {
     qDebug() << "[C++] Ejecutando:" << program << args;
     m_currentProcess->start(program, args);
 }
-
+void Backend::terminateCurrentApp() {
+    if (m_currentProcess && m_currentProcess->state() != QProcess::NotRunning) {
+        qDebug() << "[C++] Enviando SIGTERM a la app activa...";
+        m_currentProcess->terminate();
+    } else {
+        qWarning() << "[C++] Intento de cerrar app, pero no hay ninguna ejecución activa.";
+    }
+}
 
 void Backend::runCommandWithOutput(const QString &command) {
     QProcess *proc = new QProcess(this);

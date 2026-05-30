@@ -23,18 +23,10 @@ int main(int argc, char *argv[])
     qputenv("QT_QPA_PLATFORM", "wayland");
     qputenv("QT_WAYLAND_FORCE_DPI", "physical");
     qputenv("QT_SCALE_FACTOR", "1.65");
+    qputenv("QT_WAYLAND_FORCE_DPI", "physical");
+    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
 
     QGuiApplication app(argc, argv);
-
-    QPalette darkPalette;
-    darkPalette.setColor(QPalette::Window, QColor("#2D2D2D"));
-    darkPalette.setColor(QPalette::WindowText, Qt::white);
-    darkPalette.setColor(QPalette::Base, QColor("#3D3D3D"));
-    darkPalette.setColor(QPalette::AlternateBase, QColor("#2D2D2D"));
-    darkPalette.setColor(QPalette::Text, Qt::white);
-    darkPalette.setColor(QPalette::Button, QColor("#3D3D3D"));
-    darkPalette.setColor(QPalette::ButtonText, Qt::white);
-    app.setPalette(darkPalette);
 
     // 1. Rutas de iconos
     QStringList iconPaths;
@@ -42,7 +34,7 @@ int main(int argc, char *argv[])
               << "/usr/share/pixmaps"
               << "/snap/gtk-common-themes/current/share/icons";
     QIcon::setThemeSearchPaths(iconPaths);
-    QIcon::setThemeName("Yaru");
+    QIcon::setThemeName("Adwaita");
     QIcon::setFallbackThemeName("hicolor");
     Backend appBackend;
     QString testWav = "/vpt/pop.wav";

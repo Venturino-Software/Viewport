@@ -55,7 +55,18 @@ Shortcut {
     onActivated: root.zoomFactor = 1.0
 }
 
+// Coloca esto en cualquier parte de tu contenedor principal en QML
+Shortcut {
+    sequence: "Ctrl+Alt+Escape"
+    context: Qt.ApplicationShortcut // Intenta capturar el atajo en cualquier ventana de tu app
 
+    onActivated: {
+        console.log("[QML] Atajo Ctrl+Alt+Esc presionado. Solicitando matar app...")
+        if (typeof AppBackend !== "undefined") {
+            AppBackend.terminateCurrentApp()
+        }
+    }
+}
 /* STREAMING_CHUNK:Defining AppIcon component... */
 
 
@@ -480,8 +491,24 @@ StyledPopup {
                     { label: "Version:",    value: "26.2.2.orbit" },
                     { label: "Kernel:",     value: "Linux 6.12 LTS" },
                     { label: "Compiler:",   value: "GCC 13.2" },
-                    { label: "Viewport: (st)",   value: "v1.1-stable" },
-                    { label: "Viewport: (un)",   value: "v1.54-unstable" }
+                    { label: "Viewport: (st)",   value: "v1.2-stable" },
+                    { label: "Viewport: (un)",   value: "v1.62-unstable" },
+                    { label: "lib-vptcomponents",   value: "v1" },
+                    { label: "lib-vptatp",   value: "v1" },
+                    { label: "lib-vptversion",   value: "v1.1" },
+                    { label: "lib-atpterm",   value: "v2" },
+                    { label: "lib-atpcageauto",   value: "v4.62" },
+                    { label: "lib-vpticonprovider",   value: "v2" },
+                    { label: "lib-vptcommandpill",   value: "v3.12" },
+                    { label: "lib-atp-cmdwrap",   value: "v4" },
+                    { label: "lib-atp-pkitwcmd",   value: "v2" },
+                    { label: "lib-tj-eds",   value: "h" },
+                    { label: "lib-atp-parser",   value: "v14" },
+                    { label: "lib-atp-loader",   value: "v1" },
+                    { label: "lib-vpt-hyper",   value: "v2" },
+                    { label: "lib-tj-hyper",   value: "v2" },
+                    { label: "lib-pc-portable",   value: "v2" },
+                    { label: "lib-pc-mobility",   value: "v1" }
                 ]
                 delegate: RowLayout {
                     Text {
@@ -2207,6 +2234,17 @@ Item {
                         searchOverlay.state = "HIDDEN"
                         filteredSearchModel.clear()
                     }
+                    Keys.onPressed: (event) => {
+                                            if (event.key === Qt.Key_Down) {
+                                                if (searchList.currentIndex < searchList.count - 1)
+                                                    searchList.currentIndex++
+                                                event.accepted = true
+                                            } else if (event.key === Qt.Key_Up) {
+                                                if (searchList.currentIndex > 0)
+                                                    searchList.currentIndex--
+                                                event.accepted = true
+                                            }
+                                        }
                 }
 
                 Rectangle {
@@ -2250,7 +2288,13 @@ Item {
                 delegate: Rectangle {
                     width: ListView.view.width
                     height: 65 * dpScale
-                    color: searchItemArea.containsMouse ? Qt.rgba(1, 1, 1, 0.1) : "transparent"
+                    // CORRECCIÓN UX: Resalta si tiene Hover O si está seleccionado con el teclado
+                    property bool isCurrent: ListView.isCurrentItem
+                    color: (searchItemArea.containsMouse || isCurrent) ? Qt.rgba(1, 1, 1, 0.1) : "transparent"
+
+                                        // Pequeña línea izquierda cosmética si está seleccionado por teclado (estilo premium)
+                    border.color: isCurrent ? "#6688ff" : "transparent"
+                    border.width: isCurrent ? 1 : 0
                     radius: 12 * dpScale
                     Behavior on color { ColorAnimation { duration: 150 } }
 
@@ -2258,6 +2302,8 @@ Item {
                         anchors.fill: parent
                         anchors.margins: 12 * dpScale
                         spacing: 15 * dpScale
+
+
 
                         AppIcon {
                             width: 32 * dpScale
@@ -2323,12 +2369,15 @@ Item {
     }
 
     onStateChanged: {
-        if (state === "HIDDEN") {
-            searchInput.text = ""
-            updateSearchFilter("")
-            root.contentItem.forceActiveFocus()
+            if (state === "VISIBLE") {
+                searchInput.forceActiveFocus() // ← ¡BOOM! Foco automático al abrir
+                searchList.currentIndex = -1   // Resetea selección
+            } else if (state === "HIDDEN") {
+                searchInput.text = ""
+                updateSearchFilter("")
+                if (typeof root !== "undefined") root.contentItem.forceActiveFocus()
+            }
         }
-    }
 }
 
 /* STREAMING_CHUNK:Creating the transition card and loading animations... */

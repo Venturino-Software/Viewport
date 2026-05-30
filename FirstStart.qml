@@ -222,111 +222,148 @@ Rectangle {
                 // PÁGINA 1: PANTALLA Y ENTORNO
                 // ==========================================
                 Column {
-                    anchors.fill: parent
-                    spacing: 30 * dp
-                    visible: currentPage === 0
+                                    anchors.fill: parent
+                                    spacing: 30 * dp
+                                    visible: currentPage === 0
 
-                    Text {
-                        text: "Configuración de Pantalla"
-                        color: "white"
-                        font.pixelSize: titleFontSize
-                        font.bold: true
-                    }
+                                    Text {
+                                        text: "Configuración de Pantalla"
+                                        color: "white"
+                                        font.pixelSize: titleFontSize
+                                        font.bold: true
+                                    }
 
-                    Text {
-                        text: "Ajusta la resolución y la escala para que la interfaz se adapte perfectamente a tu monitor."
-                        color: "#95a5a6"
-                        font.pixelSize: baseFontSize * dp * 1.1
-                        wrapMode: Text.WordWrap
-                        width: parent.width
-                    }
+                                    Text {
+                                        text: "Ajusta la resolución y la escala para que la interfaz se adapte perfectamente a tu monitor."
+                                        color: "#95a5a6"
+                                        font.pixelSize: baseFontSize * dp * 1.1
+                                        wrapMode: Text.WordWrap
+                                        width: parent.width
+                                    }
 
-                    Grid {
-                        columns: 2
-                        spacing: 40 * dp
-                        width: parent.width
+                                    Grid {
+                                        columns: 2
+                                        spacing: 40 * dp
+                                        width: parent.width
 
-                        // Columna Izquierda
-                        Column {
-                            spacing: 20 * dp
-                            width: (parent.width - 40 * dp) / 2
+                                        // Columna Izquierda
+                                        Column {
+                                            spacing: 20 * dp
+                                            width: (parent.width - 40 * dp) / 2
 
-                            Column {
-                                spacing: 8 * dp; width: parent.width
-                                Text { text: "Dispositivo de Display:"; color: "#95a5a6"; font.pixelSize: baseFontSize * dp }
-                                TextField {
-                                    id: displayInput
-                                    width: parent.width; height: 60 * dp
-                                    text: "eDP-1"
-                                    color: "white"
-                                    background: Rectangle { color: surfaceDarker; radius: 8 * dp; border.color: parent.activeFocus ? welcomeRoot.accentColor : "#333" }
+                                            Column {
+                                                spacing: 8 * dp; width: parent.width
+                                                Text { text: "Dispositivo de Display:"; color: "#95a5a6"; font.pixelSize: baseFontSize * dp }
+                                                TextField {
+                                                    id: displayInput
+                                                    width: parent.width; height: 60 * dp
+                                                    text: "eDP-1"
+                                                    color: "white"
+                                                    background: Rectangle { color: surfaceDarker; radius: 8 * dp; border.color: parent.activeFocus ? welcomeRoot.accentColor : "#333" }
+
+                                                    // Conexión UX directa y limpia: actualiza ambos ComboBox al cambiar el monitor
+                                                    onTextChanged: {
+                                                        Qt.callLater(function() {
+                                                            if (typeof hzInput !== "undefined") hzInput.updateToCurrentHz();
+                                                            if (typeof resInput !== "undefined") resInput.updateToCurrentRes();
+                                                        })
+                                                    }
+                                                }
+                                            }
+
+                                            Column {
+                                                spacing: 14 * dp; width: parent.width
+                                                Text { text: `Escala de Renderizado: ${scaleSlider.value.toFixed(2)}`; color: "#95a5a6"; font.pixelSize: baseFontSize * dp }
+                                                Slider {
+                                                    id: scaleSlider
+                                                    width: parent.width; from: 1.0; to: 2.5; value: 1.0
+                                                }
+                                            }
+                                        }
+
+                                        // Columna Derecha
+                                        Column {
+                                            spacing: 20 * dp
+                                            width: (parent.width - 40 * dp) / 2
+
+                                            Column {
+                                                spacing: 8 * dp
+                                                width: parent.width
+
+                                                Text {
+                                                    text: "Tasa de Refresco (Hz):"
+                                                    color: "#95a5a6"
+                                                    font.pixelSize: baseFontSize * dp
+                                                }
+
+                                                ComboBox {
+                                                    id: hzInput
+                                                    width: parent.width
+                                                    height: 60 * dp
+
+                                                    model: (typeof AppBackend !== "undefined" && displayInput.text !== "")
+                                                           ? AppBackend.getAvailableRefreshRates(displayInput.text)
+                                                           : ["60"]
+
+                                                    function updateToCurrentHz() {
+                                                        if (typeof AppBackend !== "undefined" && displayInput.text !== "") {
+                                                            let currentHz = AppBackend.getCurrentRefreshRate(displayInput.text)
+                                                            let targetIndex = hzInput.find(currentHz)
+                                                            hzInput.currentIndex = targetIndex !== -1 ? targetIndex : 0
+                                                        }
+                                                    }
+
+                                                    Component.onCompleted: updateToCurrentHz()
+                                                }
+                                            }
+
+                                            Column {
+                                                spacing: 8 * dp; width: parent.width
+                                                Text { text: "Resolución:"; color: "#95a5a6"; font.pixelSize: baseFontSize * dp }
+
+                                                ComboBox {
+                                                    id: resInput
+                                                    width: parent.width; height: 60 * dp
+
+                                                    // 1. Modelo dinámico conectado al backend C++
+                                                    model: (typeof AppBackend !== "undefined" && displayInput.text !== "")
+                                                           ? AppBackend.getAvailableResolutions(displayInput.text)
+                                                           : ["1920x1080"]
+
+                                                    // 2. Función para buscar y setear la resolución activa del monitor
+                                                    function updateToCurrentRes() {
+                                                        if (typeof AppBackend !== "undefined" && displayInput.text !== "") {
+                                                            let currentRes = AppBackend.getCurrentResolution(displayInput.text)
+                                                            let targetIndex = resInput.find(currentRes)
+                                                            resInput.currentIndex = targetIndex !== -1 ? targetIndex : 0
+                                                        }
+                                                    }
+
+                                                    Component.onCompleted: updateToCurrentRes()
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Item { width: 1; height: 10 * dp } // Espaciador
+
+                                    StyledButton {
+                                        text: "Aplicar Pantalla"
+                                        width: 250 * dp
+                                        buttonColor: surfaceColor
+                                        textColor: welcomeRoot.accentColor
+                                        animationId: 1
+                                        onClicked: {
+                                            // 3. Cambiamos currentValue a currentText porque el modelo ahora es un QStringList directo
+                                            let resolucion = resInput.currentText
+                                            let hz = hzInput.currentText
+                                            let cmd = `wlr-randr --output ${displayInput.text} --scale ${scaleSlider.value.toFixed(2)} --custom-mode ${resolucion}@${hz}Hz`
+
+                                            if (typeof AppBackend !== "undefined") AppBackend.runCommand(cmd)
+                                            console.log("Ejecutando configuración de pantalla:", cmd)
+                                        }
+                                    }
                                 }
-                            }
-
-                            Column {
-                                spacing: 14 * dp; width: parent.width
-                                Text { text: `Escala de Renderizado: ${scaleSlider.value.toFixed(2)}`; color: "#95a5a6"; font.pixelSize: baseFontSize * dp }
-                                Slider {
-                                    id: scaleSlider
-                                    width: parent.width; from: 1.0; to: 2.5; value: 1.0
-                                }
-                            }
-                        }
-
-                        // Columna Derecha
-                        Column {
-                            spacing: 20 * dp
-                            width: (parent.width - 40 * dp) / 2
-
-                            Column {
-                                spacing: 8 * dp; width: parent.width
-                                Text { text: "Tasa de Refresco (Hz):"; color: "#95a5a6"; font.pixelSize: baseFontSize * dp }
-                                ComboBox {
-                                    id: hzInput
-                                    width: parent.width; height: 60 * dp
-                                    model: ["24", "30", "42", "60", "75", "124", "144", "240", "360", "520"]
-                                }
-                            }
-
-                            Column {
-                                spacing: 8 * dp; width: parent.width
-                                Text { text: "Resolución:"; color: "#95a5a6"; font.pixelSize: baseFontSize * dp }
-                                ComboBox {
-                                    id: resInput
-                                    width: parent.width; height: 60 * dp
-                                    textRole: "text"
-                                    valueRole: "value"
-                                    model: [
-                                        { text: "4K (3840x2160)",  value: "3840x2160" },
-                                        { text: "QHD (2560x1440)",  value: "2560x1440" },
-                                        { text: "FHD (1920x1080)",     value: "1920x1080" },
-                                        { text: "HD (1280x720)",           value: "1280x720" },
-                                        { text: "SD 16:9 (854x480)", value: "854x480" },
-                                        { text: "SD (640x360)",            value: "640x360" }
-                                    ]
-                                }
-                            }
-                        }
-                    }
-
-                    Item { width: 1; height: 10 * dp } // Espaciador
-
-                    StyledButton {
-                        text: "Aplicar Pantalla"
-                        width: 250 * dp
-                        buttonColor: surfaceColor
-                        textColor: welcomeRoot.accentColor
-                        animationId: 1
-                        onClicked: {
-                            let resolucion = resInput.currentValue
-                            let hz = hzInput.currentText
-                            let cmd = `wlr-randr --output ${displayInput.text} --scale ${scaleSlider.value.toFixed(2)} --custom-mode ${resolucion}@${hz}Hz`
-                            if (typeof AppBackend !== "undefined") AppBackend.runCommand(cmd)
-                            console.log("Ejecutando escalado:", cmd)
-                        }
-                    }
-                }
-
                 // ==========================================
                 // PÁGINA 2: CONFIGURACIÓN DE AUDIO
                 // ==========================================
@@ -445,6 +482,10 @@ Rectangle {
                     anchors.centerIn: parent
                     spacing: 50 * dp
                     visible: currentPage === 3
+                    onVisibleChanged:
+                        if (currentPage === 3) {
+                            AppBackend.playSound("sucess.wav")
+                        }
 
                     AnimatedImage {
                         id: finishAnim
@@ -485,6 +526,7 @@ Rectangle {
                             if (!closing) {
                                 closing = true;
                                 welcomeRoot.opacity = 0;
+                                AppBackend.playSound("interact.wav")
                             }
                         }
                     }
@@ -510,7 +552,10 @@ Rectangle {
                     buttonColor: "transparent"
                     textColor: "#95a5a6"
                     visible: currentPage > 0
-                    onClicked: currentPage--
+                    onClicked: {
+                        AppBackend.playSound("back.wav")
+                        currentPage--
+                    }
                 }
 
                 StyledButton {
@@ -523,6 +568,7 @@ Rectangle {
                     onClicked: {
                         if (currentPage < 3) {
                             currentPage++
+                            AppBackend.playSound("next.wav")
                         }
                     }
                 }

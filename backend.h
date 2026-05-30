@@ -188,6 +188,12 @@ public:
         });
     }
 
+    Q_INVOKABLE QStringList getAvailableRefreshRates(const QString &outputName);
+    Q_INVOKABLE QString getCurrentRefreshRate(const QString &outputName);
+    Q_INVOKABLE QStringList getAvailableResolutions(const QString &outputName);
+    Q_INVOKABLE QString getCurrentResolution(const QString &outputName);
+    Q_INVOKABLE void terminateCurrentApp();
+
 signals:
     void appClosed();
     void commandOutput(const QString &text);
