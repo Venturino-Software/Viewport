@@ -275,6 +275,7 @@ function updateSearchFilter(text) {
             {n: "Ajustar Volumen", c: "Audio", e: "VPT_SYS|volume"},
             {n: "Ajustar Brillo", c: "Pantalla", e: "VPT_SYS|brightness"},
             {n: "Redes WiFi", c: "Redes", e: "VPT_SYS|wifi"},
+            {n: "tj-hyper Wifi Test", c: "Redes", e: "VPT_SYS|testwifi"},
         ]
 
         for (var j = 0; j < sysCmds.length; j++) {
@@ -359,6 +360,9 @@ function executeSmartAction(execString, appName) {
             break
         case "vn":
             versionPopup.open()
+            break
+        case "testwifi":
+            speedTestPopup.open()
             break
         default:
             // Cualquier otro comando directo (ej: kitty -e nmtui)
@@ -1656,139 +1660,376 @@ StyledPopup {
     }
 }
 
+
 StyledPopup {
     id: wifiPopup
-    width: 400 * dpScale
-    height: 450 * dpScale
+    width: 450 * dpScale
+    height: 550 * dpScale
     accentColor: "#4fc3f7"
 
-    ListModel {
-        id: wifiModel
-        ListElement { ssid: ""; encrypted: false }
-    }
+    // Paleta de colores Dark Theme integrada
+    property color bgColor: "#1e1e2e"
+    property color surfaceColor: "#2a2a3a"
+    property color surfaceHover: "#3b3b4f"
+    property color textColor: "#ffffff"
+    property color textMuted: "#a6adc8"
+
+    property string currentInterface: ""
+
+    ListModel { id: interfacesModel }
+    ListModel { id: wifiModel }
 
     onOpened: {
-        wifiModel.clear()
-        var networks = AppBackend.scanWifi()
-        for (var i = 0; i < networks.length; i++) {
-            wifiModel.append({ "ssid": networks[i].ssid, "encrypted": networks[i].encrypted })
+        loadInterfaces()
+    }
+
+    function loadInterfaces() {
+        interfacesModel.clear()
+        var ifaces = AppBackend.getWifiInterfaces()
+        for (var i = 0; i < ifaces.length; i++) {
+            interfacesModel.append({ "ifaceName": ifaces[i] })
         }
+
+        // Auto-seleccionar la primera antena si existe
+        if (ifaces.length > 0) {
+            currentInterface = ifaces[0]
+            refreshNetworks()
+        }
+    }
+
+    function refreshNetworks() {
+        wifiModel.clear()
+        if (currentInterface === "") return;
+
+        var networks = AppBackend.scanWifi(currentInterface)
+        for (var i = 0; i < networks.length; i++) {
+            wifiModel.append({
+                "ssid": networks[i].ssid,
+                "encrypted": networks[i].encrypted
+            })
+        }
+    }
+
+    // Fondo base oscuro para el popup (asumiendo que StyledPopup acepta background, si no, usa un Rectangle)
+    Rectangle {
+        anchors.fill: parent
+        color: wifiPopup.bgColor
+        radius: 10 * dpScale
+        z: -1
     }
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: 12 * dpScale
+        anchors.margins: 20 * dpScale
+        spacing: 16 * dpScale
 
+        // --- ENCABEZADO ---
         Text {
-            text: "Redes WiFi disponibles"
-            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ?
-                FontManager.titleFontFamily : "DejaVu Sans"
-            font.pixelSize: 18 * dpScale
-            color: "#ffffff"
+            text: "Conexión Inalámbrica"
+            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ? FontManager.titleFontFamily : "DejaVu Sans"
+            font.pixelSize: 22 * dpScale
+            color: wifiPopup.textColor
             font.bold: true
         }
 
+        // --- SELECTOR DE INTERFAZ (ANTENA) ---
+        RowLayout {
+            Layout.fillWidth: true
+            visible: interfacesModel.count > 0
+
+            Text {
+                text: "Adaptador:"
+                color: wifiPopup.textMuted
+                font.pixelSize: 14 * dpScale
+            }
+
+            ComboBox {
+                Layout.fillWidth: true
+                model: interfacesModel
+                textRole: "ifaceName"
+
+                // Personalización minimalista para adaptarse al tema
+                background: Rectangle {
+                    color: wifiPopup.surfaceColor
+                    radius: 6 * dpScale
+                }
+                contentItem: Text {
+                    text: parent.currentText
+                    color: wifiPopup.accentColor
+                    font.pixelSize: 14 * dpScale
+                    font.bold: true
+                    verticalAlignment: Text.AlignVCenter
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                onCurrentTextChanged: {
+                    if (currentText !== "") {
+                        wifiPopup.currentInterface = currentText
+                        wifiPopup.refreshNetworks()
+                    }
+                }
+            }
+
+            // Botón de recarga (Texto en lugar de icono)
+            StyledButton {
+                text: "Buscar"
+                Layout.preferredHeight: 36 * dpScale
+                onClicked: wifiPopup.refreshNetworks()
+            }
+        }
+
+        // Mensaje si no hay antena
+        Text {
+            visible: interfacesModel.count === 0
+            text: "No se detectaron adaptadores Wi-Fi."
+            color: "#f28b82" // Rojo suave
+            font.pixelSize: 14 * dpScale
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        // --- LISTA DE REDES ---
         ListView {
+            id: networkList
             Layout.fillWidth: true
             Layout.fillHeight: true
             model: wifiModel
             clip: true
+            spacing: 8 * dpScale
+
             delegate: ItemDelegate {
                 width: ListView.view.width
-                text: model.ssid + (model.encrypted ? " 🔒" : "")
+                height: 60 * dpScale
+
                 background: Rectangle {
-                    color: hovered ? "#2a2a3a" : "transparent"
-                    radius: 6
+                    color: parent.hovered ? wifiPopup.surfaceHover : wifiPopup.surfaceColor
+                    radius: 8 * dpScale
+
+                    // Borde sutil al pasar el ratón
+                    border.color: parent.hovered ? wifiPopup.accentColor : "transparent"
+                    border.width: 1
+
+                    Behavior on color { ColorAnimation { duration: 150 } }
                 }
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 12 * dpScale
+                    spacing: 10 * dpScale
+
+                    // Nombre de la red
+                    Text {
+                        text: model.ssid
+                        color: wifiPopup.textColor
+                        font.pixelSize: 16 * dpScale
+                        font.bold: true
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                    }
+
+                    // Etiqueta de Seguridad (Reemplaza al símbolo del candado)
+                    Rectangle {
+                        Layout.preferredWidth: securityLabel.width + 16 * dpScale
+                        Layout.preferredHeight: securityLabel.height + 8 * dpScale
+                        color: model.encrypted ? "#422828" : "#28422e" // Fondo rojo o verde muy oscuro
+                        border.color: model.encrypted ? "#f28b82" : "#81c995"
+                        border.width: 1
+                        radius: 4 * dpScale
+
+                        Text {
+                            id: securityLabel
+                            anchors.centerIn: parent
+                            text: model.encrypted ? "Protegida" : "Abierta"
+                            color: model.encrypted ? "#f28b82" : "#81c995"
+                            font.pixelSize: 11 * dpScale
+                            font.bold: true
+                        }
+                    }
+                }
+
                 onClicked: {
                     if (model.encrypted) {
-                        // Abrir popup de contraseña
+                        // Importante: Pásale también la interfaz al popup de contraseña
                         wifiPasswordPopup.ssid = model.ssid
+                        wifiPasswordPopup.iface = wifiPopup.currentInterface
                         wifiPasswordPopup.open()
                     } else {
-                        AppBackend.connectWifi(model.ssid, "")
+                        AppBackend.connectWifi(wifiPopup.currentInterface, model.ssid, "")
                         wifiPopup.close()
                     }
                 }
             }
-        }
 
-        StyledButton {
-            text: "Configurar adaptador WiFi"
-            Layout.minimumHeight: 44 * dpScale
-            Layout.fillWidth: true
-            onClicked: AppBackend.openApp("/vpt/adm/bin/netconfig.sh")
-            animationId: 2
+            // Animación al cargar las listas
+            add: Transition {
+                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 300 }
+                NumberAnimation { property: "x"; from: -50; to: 0; duration: 300; easing.type: Easing.OutQuad }
+            }
         }
     }
 }
-
 // Popup para pedir contraseña de red WiFi encriptada
 StyledPopup {
     id: wifiPasswordPopup
     property string ssid: ""
+    property string iface: ""
+    property string securityType: "" // <-- CAMBIO 4: Nueva propiedad receptora
+
     width: 400 * dpScale
-    height: 280 * dpScale
-    accentColor: "#4fc3f7"
+    height: 240 * dpScale
+    focus: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+    // Forzamos fondo plano Material Dark sin bordes llamativos externos
+    background: Rectangle {
+        color: "#1e1e2e" // Mismo fondo que el principal
+        radius: 12 * dpScale
+    }
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: 15 * dpScale
+        anchors.margins: 24 * dpScale // Margen amplio estilo Material
+        spacing: 20 * dpScale
 
+        // Título Material
         Text {
-            text: "Contraseña para: " + wifiPasswordPopup.ssid
-            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ?
-                FontManager.titleFontFamily : "DejaVu Sans"
-            font.pixelSize: 16 * dpScale
+            text: "Introducir contraseña"
+            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ? FontManager.titleFontFamily : "DejaVu Sans"
+            font.pixelSize: 20 * dpScale
             color: "#ffffff"
             font.bold: true
-            wrapMode: Text.WordWrap
             Layout.fillWidth: true
         }
 
+        // Subtítulo con el nombre de la red
+        Text {
+            text: "Red: " + wifiPasswordPopup.ssid
+            font.pixelSize: 14 * dpScale
+            color: "#a6adc8" // Text Muted
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+            Layout.topMargin: -10 * dpScale // Pegado al título
+        }
+
+        // Campo de texto estilo Material Design 3 (Filled + Underline)
         TextField {
             id: wifiPasswordField
             echoMode: TextInput.Password
-            placeholderText: "Contraseña de la red"
+            placeholderText: "Contraseña"
+            placeholderTextColor: "#6c7086"
             Layout.fillWidth: true
-            background: Rectangle {
-                radius: 8
-                color: "#1e1e2e"
-                border.color: "#4fc3f7"
-            }
+            focus: true
             color: "#ffffff"
-        }
+            font.pixelSize: 16 * dpScale
+            leftPadding: 12 * dpScale
+            rightPadding: 12 * dpScale
+            bottomPadding: 10 * dpScale
+            topPadding: 10 * dpScale
 
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 10 * dpScale
+            // Contenedor Material: Fondo plano grisáceo, sin bordes laterales
+            background: Rectangle {
+                color: "#2a2a3a" // surfaceColor
+                radius: 4 * dpScale
 
-            StyledButton {
-                text: "Conectar"
-                Layout.minimumHeight: 44 * dpScale
-                Layout.fillWidth: true
-                buttonColor: "#4fc3f7"
-                onClicked: {
-                    if (wifiPasswordField.text === "") return
-                    AppBackend.connectWifi(wifiPasswordPopup.ssid, wifiPasswordField.text)
-                    wifiPasswordPopup.close()
-                    wifiPopup.close()
+                // Línea inferior activa/inactiva de Material
+                Rectangle {
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: wifiPasswordField.activeFocus ? 2 * dpScale : 1 * dpScale
+                    color: wifiPasswordField.activeFocus ? "#4fc3f7" : "#585b70" // Celeste solo si está escribiendo
+
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on height { NumberAnimation { duration: 100 } }
                 }
             }
+        }
+
+        // Botonera alineada a la derecha estilo Material Dialog
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8 * dpScale
+            Layout.topMargin: 10 * dpScale
+
+            // Espaciador para empujar los botones a la derecha
+            Item { Layout.fillWidth: true }
 
             StyledButton {
                 text: "Cancelar"
-                Layout.minimumHeight: 44 * dpScale
-                Layout.fillWidth: true
+                Layout.preferredHeight: 40 * dpScale
+                Layout.preferredWidth: 100 * dpScale
+                buttonColor: "transparent" // Botón plano
+                textColor: "#4fc3f7"
                 onClicked: wifiPasswordPopup.close()
-                animationId: 2
+            }
+
+            StyledButton {
+                text: "Conectar"
+                Layout.preferredHeight: 40 * dpScale
+                Layout.preferredWidth: 110 * dpScale
+                buttonColor: "#4fc3f7"
+                textColor: "#11111b" // Texto oscuro sobre botón brillante
+
+                onClicked: {
+                    if (wifiPasswordField.text === "") return
+
+                    // 1. Guardar el resultado de la conexión (true/false)
+                    var success = AppBackend.connectWifi(
+                        wifiPasswordPopup.iface,
+                        wifiPasswordPopup.ssid,
+                        wifiPasswordField.text      // ← sin coma extra, solo 3 argumentos
+                    )
+
+                    // 2. Preparar el mensaje según el resultado
+                    if (success) {
+                        statusPopup.message = "Conexion Establecida"
+                    } else {
+                        statusPopup.message = "Error de autenticacion: Contra incorrecta"
+                    }
+
+                    // 3. Mostrar popup de estado y cerrar los demás
+                    statusPopup.open()
+                    wifiPasswordPopup.close()
+                    wifiPopup.close()
+                }
             }
         }
     }
 
     onClosed: {
-        wifiPasswordField.text = "" // limpiar contraseña al cerrar
+        wifiPasswordField.text = ""
+    }
+}
+
+StyledPopup {
+    id: statusPopup
+    width: 300 * dpScale
+    height: 180 * dpScale
+    accentColor: "#4fc3f7"
+    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+    property string message: ""
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 20 * dpScale
+
+        Text {
+            text: statusPopup.message
+            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ?
+                          FontManager.titleFontFamily : "DejaVu Sans"
+            font.pixelSize: 16 * dpScale
+            color: "#ffffff"
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+            horizontalAlignment: Text.AlignHCenter
+        }
+
+        StyledButton {
+            text: "Aceptar"
+            Layout.alignment: Qt.AlignHCenter
+            Layout.minimumHeight: 44 * dpScale
+            onClicked: statusPopup.close()
+        }
     }
 }
 
@@ -2119,6 +2360,178 @@ Item {
     }
 }
 
+StyledPopup {
+    id: speedTestPopup
+    width: 380 * dpScale
+    height: 420 * dpScale
+    accentColor: "#4fc3f7"
+    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+    // Variables internas
+    property bool testing: false
+    property real pingValue: 0        // ms
+    property real downloadValue: 0    // Mbps
+    property real uploadValue: 0      // Mbps
+    property string errorMsg: ""
+
+    // Máximo de las barras (para que no se salgan del ancho)
+    readonly property real maxSpeed: 1000  // Mbps (ajusta según tu conexión)
+
+    background: Rectangle {
+        color: "#1e1e2e"
+        radius: 12 * dpScale
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: 24 * dpScale
+        spacing: 16 * dpScale
+
+        Text {
+            text: "Test de Velocidad WiFi"
+            font.family: (typeof FontManager !== "undefined" && FontManager && FontManager.titleFontFamily) ?
+                          FontManager.titleFontFamily : "DejaVu Sans"
+            font.pixelSize: 20 * dpScale
+            font.bold: true
+            color: "#ffffff"
+            Layout.fillWidth: true
+        }
+
+        // ---- Ping ----
+        RowLayout {
+            Layout.fillWidth: true
+            Text {
+                text: "Latencia (PING)"
+                color: "#a6adc8"
+                font.pixelSize: 14 * dpScale
+                Layout.preferredWidth: 120 * dpScale
+            }
+            Text {
+                id: pingText
+                text: speedTestPopup.testing ? "..." : (speedTestPopup.pingValue.toFixed(1) + " ms")
+                color: "#4fc3f7"
+                font.pixelSize: 16 * dpScale
+                font.bold: true
+            }
+        }
+
+        // ---- Descarga ----
+        Text {
+            text: "Descarga"
+            color: "#a6adc8"
+            font.pixelSize: 14 * dpScale
+        }
+
+        // Barra de descarga
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 20 * dpScale
+            color: "#2a2a3a"
+            radius: 4 * dpScale
+            Rectangle {
+                id: downloadBar
+                height: parent.height
+                width: parent.width * Math.min(speedTestPopup.downloadValue / speedTestPopup.maxSpeed, 1.0)
+                color: "#4fc3f7"
+                radius: 4 * dpScale
+                Behavior on width { NumberAnimation { duration: 300 } }
+            }
+        }
+
+        Text {
+            id: downloadText
+            text: speedTestPopup.testing ? "..." : (speedTestPopup.downloadValue.toFixed(2) + " Mbps")
+            color: "#ffffff"
+            font.pixelSize: 16 * dpScale
+            font.bold: true
+        }
+
+        // ---- Subida ----
+        Text {
+            text: "Subida"
+            color: "#a6adc8"
+            font.pixelSize: 14 * dpScale
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 20 * dpScale
+            color: "#2a2a3a"
+            radius: 4 * dpScale
+            Rectangle {
+                id: uploadBar
+                height: parent.height
+                width: parent.width * Math.min(speedTestPopup.uploadValue / speedTestPopup.maxSpeed, 1.0)
+                color: "#4fc3f7"
+                radius: 4 * dpScale
+                Behavior on width { NumberAnimation { duration: 300 } }
+            }
+        }
+
+        Text {
+            id: uploadText
+            text: speedTestPopup.testing ? "..." : (speedTestPopup.uploadValue.toFixed(2) + " Mbps")
+            color: "#ffffff"
+            font.pixelSize: 16 * dpScale
+            font.bold: true
+        }
+
+        // Mensaje de error (oculto si no hay)
+        Text {
+            id: errorLabel
+            text: speedTestPopup.errorMsg
+            color: "#ff5252"
+            font.pixelSize: 13 * dpScale
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+            visible: speedTestPopup.errorMsg !== ""
+        }
+
+        // Botones
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.topMargin: 10 * dpScale
+
+            StyledButton {
+                text: speedTestPopup.testing ? "Midiendo..." : "Iniciar Test"
+                enabled: !speedTestPopup.testing
+                Layout.preferredHeight: 44 * dpScale
+                Layout.fillWidth: true
+                buttonColor: speedTestPopup.testing ? "#555" : "#4fc3f7"
+                onClicked: {
+                    speedTestPopup.testing = true
+                    speedTestPopup.errorMsg = ""
+                    // Llama al backend (asíncrono, necesitaremos callback)
+                    AppBackend.startSpeedTest()
+                }
+            }
+
+            StyledButton {
+                text: "Cerrar"
+                Layout.preferredHeight: 44 * dpScale
+                Layout.fillWidth: true
+                buttonColor: "transparent"
+                textColor: "#4fc3f7"
+                onClicked: speedTestPopup.close()
+            }
+        }
+    }
+
+    // Conexión con C++ para recibir resultados
+    Connections {
+        target: AppBackend
+        function onSpeedTestFinished(download, upload, ping) {
+            speedTestPopup.testing = false
+            speedTestPopup.downloadValue = download
+            speedTestPopup.uploadValue = upload
+            speedTestPopup.pingValue = ping
+        }
+        function onSpeedTestError(message) {
+            speedTestPopup.testing = false
+            speedTestPopup.errorMsg = message
+        }
+    }
+}
 
 
 /* STREAMING_CHUNK:Implementing the search overlay... */

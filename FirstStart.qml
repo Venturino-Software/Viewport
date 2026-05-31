@@ -6,6 +6,8 @@
  * bajo los términos de la Licencia Pública General de GNU según es publicada
  * por la Free Software Foundation, ya sea la versión 3 de la Licencia,
  * o (a tu elección) cualquier versión posterior.
+ *
+ * lib-vptsetup
  */
 
 import QtQuick 2.15
@@ -42,7 +44,16 @@ Rectangle {
     readonly property real dp: scaleFactor
     readonly property real baseFontSize: 16
     readonly property real titleFontSize: baseFontSize * dp * 2.2
-
+    MouseArea {
+            id: backgroundBlocker
+            anchors.fill: parent
+            // Habilitado solo mientras no estemos cerrando la pantalla
+            enabled: !welcomeRoot.closing
+            // Captura también eventos de hover para que no pasen al fondo
+            hoverEnabled: true
+            // No hace nada, solo consume los eventos para que no se propaguen hacia atrás
+            onClicked: {}
+    }
     states: [
         State {
             name: "videoMode"
@@ -117,6 +128,7 @@ Rectangle {
             console.log("Verificación de canal completada para:", selectedChannel)
             popupNotification.popupText = "Canal '" + selectedChannel + "' configurado con éxito."
             popupNotification.open()
+            AppBackend.playSound("detail.wav")
         }
     }
 
@@ -181,6 +193,7 @@ Rectangle {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
                     welcomeVideo.stop()
+                    AppBackend.playSound("interact.wav")
                     welcomeRoot.state = "configMode"
                 }
             }
@@ -443,7 +456,7 @@ Rectangle {
                     }
 
                     Text {
-                        text: "Selecciona el origen de los paquetes de actualización APT para Viewport OS. Puedes elegir la estabilidad absoluta o lo último en características."
+                        text: "Selecciona el origen de los paquetes de actualización APT para ATP. Puedes elegir la estabilidad absoluta o lo último en características."
                         color: "#95a5a6"
                         font.pixelSize: baseFontSize * dp * 1.1
                         wrapMode: Text.WordWrap
@@ -490,8 +503,8 @@ Rectangle {
                     AnimatedImage {
                         id: finishAnim
                         source: "file:///vpt/bin/src/finish.gif"
-                        width: 250 * dp
-                        height: 250 * dp
+                        width: 300 * dp
+                        height: 300 * dp
                         anchors.horizontalCenter: parent.horizontalCenter
 
                         // Controlamos el estado inicial: solo juega si estamos en la pagina 3

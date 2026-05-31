@@ -6,6 +6,50 @@
  * bajo los términos de la Licencia Pública General de GNU según es publicada
  * por la Free Software Foundation, ya sea la versión 3 de la Licencia,
  * o (a tu elección) cualquier versión posterior.
+ *
+ * Powered by Debian 13 (trixie)
+ * VPT
+ * \- The Joints Library
+ * \- The Viewport Library
+ * \- The ATP Utils Library
+ *
+ * Thanks for all for contributing this proyect.
+ * [last milestone=100 commits]
+ *
+ * Developed by:
+ * a little bit of AI
+ * - gemini 3.1 pro (20% design)
+ * - deepseek R1 (debug)
+ * soooo much human
+ * - Soyzian (Soy Zeus Ian Ruffo)
+ * -- (Soy-Z-Ian):
+ * 100% participation:
+ * - lib-vpt-components
+ * - lib-atp-loader
+ * - sources - background design
+ * - git - repo
+ * - UX/UI main leader
+ * 70% participation:
+ * - all rest of viewport
+ * 0% participation:
+ * - none
+ *
+ * All people is welcome to contribute to viewport, following the next link:
+ *
+ *       /---------------  Viewport Repository  -------------------\
+ *              https://github.com/Venturino-Software/Viewport
+ *       \---------------------------------------------------------/
+ *          -   Composition
+ *              QML 66.6%   [##############      ] .qml
+ *              C++ 29.1%   [#######             ] .h .cpp
+ *              CMake 3.6%  [##                  ] <cmake>
+ *              Shell 0.7%  [#                   ] .sh .zsh
+ *        /------------------  Venturino Site  --------------------\
+ *                  https://github.com/Venturino-Software
+ *       \---------------------------------------------------------/
+ *          -   Composition
+ *              Top Language: QML [X]
+ *
  */
 
 #include "backend.h"
@@ -19,6 +63,10 @@ Backend::~Backend() {
         m_currentProcess->waitForFinished(1000);
     }
 }
+
+/*
+ *  lib-tj-hyper + lib-pc-mobility (display)
+ */
 QStringList Backend::getAvailableRefreshRates(const QString &outputName) {
     QStringList rates;
     if (outputName.isEmpty()) return rates;
@@ -158,86 +206,120 @@ QString Backend::getCurrentRefreshRate(const QString &outputName) {
 }
 
 /*
-QVariantList Backend::loadDesktopApps() {
-    QVariantList apps;
-    QStringList paths = {
-        "/usr/share/applications",
-        QDir::homePath() + "/.local/share/applications"
-    };
+ *  lib-tj-hyper + lib-pc-mobility (wifi)
+ */
+QVariantList Backend::getWifiInterfaces() {
+    QVariantList interfaces;
+    QProcess p;
+    // Pedimos a nmcli que liste los dispositivos y su tipo
+    p.start("nmcli", {"-t", "-f", "DEVICE,TYPE", "device"});
+    p.waitForFinished(2000);
 
-    for (const QString &path : paths) {
-        QDir dir(path);
-        if (!dir.exists()) continue;
-        QStringList files = dir.entryList(QStringList() << "*.desktop", QDir::Files);
-        for (const QString &file : files) {
-            QFile f(dir.absoluteFilePath(file));
-            if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-                QTextStream in(&f);
-                QString name, icon, exec, category;
-                bool noDisplay = false;
-                bool isTerminal = false;
-                bool inDesktopEntry = false;
+    QString out = p.readAllStandardOutput();
+    QStringList lines = out.split('\n', Qt::SkipEmptyParts);
 
-                while (!in.atEnd()) {
-                    QString line = in.readLine().trimmed();
-                    if (line == "[Desktop Entry]") { inDesktopEntry = true; continue; }
-                    if (line.startsWith("[")) { inDesktopEntry = false; continue; }
-                    if (!inDesktopEntry) continue;
+    for (const QString &line : lines) {
+        QStringList parts = line.split(':');
+        // Si el dispositivo es de tipo "wifi", lo agregamos
+        if (parts.size() >= 2 && parts[1] == "wifi") {
+            interfaces.append(parts[0]);
+        }
+    }
+    return interfaces;
+}
 
-                    if (line.startsWith("Name=")) {
-                        name = line.mid(5);
-                        name.replace(QRegularExpression("\\s*\\([^)]*\\)"), "");
-                        name = name.trimmed();
-                    } else if (line.startsWith("Icon=")) icon = line.mid(5);
-                    // Después de obtener 'icon'
-                    else if (line.startsWith("Icon=")) {
-                        icon = line.mid(5);
-                        // Normalizar icono
-                        if (icon.startsWith('/')) {
-                            if (!QFile::exists(icon)) {
-                                QFileInfo fi(icon);
-                                icon = fi.completeBaseName();
-                                qDebug() << "[C++] Icono como ruta no encontrado, usando nombre de tema:" << icon;
-                            }
-                        }
-                    }
-                    else if (line.startsWith("Categories=")) category = line.mid(11);
-                    else if (line.startsWith("NoDisplay=true")) noDisplay = true;
-                    else if (line.startsWith("Terminal=true")) isTerminal = true;
-                    else if (line.startsWith("Exec=")) {
-                        exec = line.mid(5);
-                        exec.replace(QRegularExpression("%[uUfF]"), "");
-                        exec = exec.trimmed();
-                    }
-                }
-                f.close();
+QVariantList Backend::scanWifi(const QString &iface) {
+    QVariantList list;
+    if (iface.isEmpty()) return list;
 
-                if (!noDisplay && !name.isEmpty() && !exec.isEmpty()) {
-                    if (isTerminal) {
-                        exec = "kitty -e " + exec;
-                    }
-                    QVariantMap appMap;
-                    appMap["name"] = name;
-                    appMap["icon"] = icon;
-                    appMap["exec"] = exec;
-                    appMap["category"] = category.split(";").first();
-                    apps.append(appMap);
-                }
-            }
+    QProcess p;
+    // 1. Forzamos un escaneo fresco en la antena seleccionada
+    p.start("nmcli", {"device", "wifi", "rescan", "ifname", iface});
+    p.waitForFinished(3000);
+
+    // 2. Listamos los resultados
+    p.start("nmcli", {"-t", "-f", "SSID,SECURITY", "device", "wifi", "list", "ifname", iface});
+    p.waitForFinished(5000);
+
+    if (p.exitCode() != 0) {
+        qWarning() << "[Wi-Fi] nmcli error:" << p.readAllStandardError();
+        return list;
+    }
+
+    QString out = p.readAllStandardOutput();
+    QStringList lines = out.split('\n', Qt::SkipEmptyParts);
+    QSet<QString> seenSSIDs; // Para no mostrar duplicados
+
+    for (const QString &line : lines) {
+        int firstColon = line.indexOf(':');
+        if (firstColon != -1) {
+            // Reemplazamos los ":" escapados en caso de que el SSID los contenga
+            QString ssid = line.left(firstColon).replace("\\:", ":");
+            QString security = line.mid(firstColon + 1);
+
+            // Ignoramos redes vacías (ocultas) o ya procesadas
+            if (ssid.isEmpty() || ssid == "--" || seenSSIDs.contains(ssid)) continue;
+
+            QVariantMap net;
+            net["ssid"] = ssid;
+            net["encrypted"] = (security != "" && security != "--");
+            net["security_type"] = security;
+            list.append(net);
+            seenSSIDs.insert(ssid);
+        }
+    }
+    return list;
+}
+bool Backend::connectWifi(const QString &iface, const QString &ssid, const QString &password)
+{
+    // 1. Borramos cualquier perfil previo con ese SSID (sin esperar resultado)
+    QProcess::execute("/usr/bin/pkexec",
+                      QStringList() << "/usr/bin/nmcli" << "connection" << "delete" << ssid);
+
+    // 2. Construir los argumentos de conexión
+    QStringList args;
+    args << "device" << "wifi" << "connect" << ssid
+         << "ifname" << iface;
+    if (!password.isEmpty()) {
+        args << "password" << password;
+    }
+
+    // 3. Ejecutar de forma síncrona (bloquea el hilo principal unos segundos)
+    QProcess p;
+    p.start("/usr/bin/pkexec", QStringList() << "/usr/bin/nmcli" << args);
+    p.waitForFinished(10000);  // 10 segundos máximo
+
+    QString output = p.readAllStandardOutput();
+    QString errOutput = p.readAllStandardError();
+    int exitCode = p.exitCode();
+
+    // 4. Determinar éxito
+    //    nmcli exitoso devuelve 0 e imprime "successfully activated"
+    // 4. Determinar éxito
+    //    nmcli devuelve 0 si se conectó correctamente.
+    //    Podemos ignorar la salida textual y confiar en el exit code.
+    bool success = (exitCode == 0);
+
+    // Opcional: puedes verificar que no haya mensajes de error en stderr
+    if (success && !errOutput.isEmpty()) {
+        // Si hay algo en stderr, quizá no sea éxito real (poco probable si exitCode=0)
+        if (errOutput.contains("Error", Qt::CaseInsensitive) ||
+            errOutput.contains("failure", Qt::CaseInsensitive)) {
+            success = false;
         }
     }
 
-    if (apps.isEmpty()) {
-        qDebug() << "[C++] No se encontraron .desktops. Cargando apps por defecto.";
-        QVariantMap term; term["name"] = "Terminal"; term["icon"] = "utilities-terminal"; term["exec"] = "kitty"; term["category"] = "System";
-        QVariantMap web; web["name"] = "Navegador"; web["icon"] = "browser"; web["exec"] = "firefox"; web["category"] = "Network";
-        apps.append(term);
-        apps.append(web);
-    }
-    return apps;
-}
-*/
+    // Línea de depuración (bórrala cuando todo funcione)
+    qDebug() << "[WiFi] connect exitCode:" << exitCode
+             << "success:" << success
+             << "\nstdout:" << output
+             << "\nstderr:" << errOutput;
 
+    return success;
+}
+/*
+ *  lib-tj-hyper + lib-pc-mobility (file managment)
+ */
 QString Backend::readFile(const QString& path) {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -259,6 +341,11 @@ void Backend::writeFile(const QString& path, const QString& content) {
     file.close();
 }
 
+/*
+ *
+ *  lib-vpt
+ *
+ */
 QVariantList Backend::loadDesktopApps() {
     QVariantList apps;
     QStringList paths = {
@@ -364,6 +451,11 @@ QVariantList Backend::loadDesktopApps() {
 
     return apps;
 }
+/*
+ *
+ *  lib-jt-eds (management of cage ""ENVIROVEMENT DESKTOP SERVER"")
+ *
+ */
 void Backend::openApp(const QString &execCommand) {
     if (m_currentProcess && m_currentProcess->state() != QProcess::NotRunning) {
         qWarning() << "[C++] Ya hay una app corriendo.";
@@ -407,7 +499,11 @@ void Backend::terminateCurrentApp() {
         qWarning() << "[C++] Intento de cerrar app, pero no hay ninguna ejecución activa.";
     }
 }
-
+/*
+ *
+ *  lib-atp-cmdwrap
+ *
+ */
 void Backend::runCommandWithOutput(const QString &command) {
     QProcess *proc = new QProcess(this);
     proc->setProcessChannelMode(QProcess::MergedChannels);
@@ -437,7 +533,9 @@ void Backend::runCommandWithOutput(const QString &command) {
 
     proc->start("/bin/bash", QStringList() << "-c" << command);
 }
-
+/*
+     *  lib-tj-hyper + lib-pc-mobility (sound)
+     */
 int Backend::getVolume() {
     QProcess p;
     // "@DEFAULT_AUDIO_SINK@" apunta automáticamente a la salida activa (auriculares o parlantes)
@@ -473,7 +571,9 @@ void Backend::playTestSound() {
     QProcess::startDetached("aplay", {"/src/test.wav"});
 }
 
-
+/*
+     *  lib-tj-hyper + lib-pc-mobility (brigthness)
+     */
 int Backend::getBrightness() {
     QProcess p;
     p.start("brightnessctl", {"-m", "g"});
@@ -491,7 +591,11 @@ int Backend::getBrightness() {
 void Backend::setBrightness(int val) {
     QProcess::startDetached("/usr/bin/pkexec", QStringList() << "brightnessctl" << "s" << QString::number(val) + "%");
 }
-
+/*
+     *
+     *  lib-atp-pkitwcmd
+     *
+     */
 void Backend::runCommandWithSudo(const QString &command, const QString &password, QJSValue callback) {
     QProcess *proc = new QProcess(this);
     proc->start("/usr/bin/pkexec", QStringList() << "-S" << "-p" << "" << "sh" << "-c" << command);
@@ -514,57 +618,6 @@ void Backend::runCommandWithSudo(const QString &command, const QString &password
         proc->deleteLater();
     });
 }
-
-
-QVariantList Backend::scanWifi() {
-    QVariantList list;
-    QProcess p;
-    p.start("nmcli", {"device", "wifi", "rescan"});
-    p.waitForFinished(2000);
-    // luego el listado
-    p.start("pkexec", {"/usr/bin/nmcli", "-t", "-f", "SSID,SECURITY", "device", "wifi", "list"});
-    p.waitForFinished(5000);
-    if (p.exitCode() != 0) {
-        qWarning() << "nmcli error:" << p.readAllStandardError();
-        return list;
-    }
-    QString out = p.readAllStandardOutput();
-    QStringList lines = out.split('\n', Qt::SkipEmptyParts);
-    for (const QString &line : lines) {
-        QStringList parts = line.split(':');
-        if (parts.size() >= 2) {
-            QVariantMap net;
-            net["ssid"] = parts[0];
-            net["encrypted"] = (parts[1] != "" && parts[1] != "--");
-            list.append(net);
-        }
-    }
-    return list;
-}
-
-void Backend::runNS(const QString &args) {
-    QProcess *process = new QProcess();
-
-    // Conectamos señales para ver qué pasa
-    // viewport, conexion total
-    connect(process, &QProcess::readyReadStandardOutput, [=]() {
-        // Aquí podrías emitir una señal a QML para mostrar el log
-        emit logUpdated(process->readAllStandardOutput());
-    });
-
-    // ¡Ojo aquí! Para el sudo, necesitas manejar la entrada de contraseña
-    // o configurar un archivo sudoers para que este script no pida pass
-    // Como entiende Soyzian esta funcion:
-    // proceso: empezar: pica kulo exec, quality lista de strings, ruta de binario/configuracion de internet
-    process->start("/usr/bin/pkexec", QStringList() << "/vpt/adm/bin/netconfig.sh" << args);
-}
-
-void Backend::connectWifi(const QString &ssid, const QString &password) {
-    QStringList args;
-    args << "device" << "wifi" << "connect" << ssid;
-    if (!password.isEmpty()) args << "password" << password;
-    QProcess::startDetached("/usr/bin/pkexec", QStringList() << "/usr/bin/nmcli" << args);
-}
 void Backend::runPkexec(const QString &command) {
     QProcess *proc = new QProcess(this);
     proc->start("/usr/bin/pkexec", QStringList() << "sh" << "-c" << command);
@@ -586,7 +639,11 @@ void Backend::runPkexec(const QString &command) {
         proc->deleteLater();
     });
 }
-
+/*
+     *
+     *  lib-vptatp
+     *
+     */
 void Backend::checkForUpdates() {
     // 1. Ejecutar apt update con permisos (pedirá autenticación gráfica)
     QProcess *updateProc = new QProcess(this);
@@ -641,7 +698,11 @@ void Backend::checkForUpdates() {
         updateProc->deleteLater();
     });
 }
-
+/*
+     *
+     *  lib-vpt-hyper (LEGACY)
+     *
+     */
 void Backend::aptInstall(const QString &package, const QString &sudoPassword) {
     QProcess *proc = new QProcess(this);
     QString cmd = QString("apt install -y %1").arg(package);
@@ -675,5 +736,57 @@ void Backend::aptInstall(const QString &package, const QString &sudoPassword) {
 
     // Ejemplo conceptual en tu C++
 
+}
+
+
+void Backend::startSpeedTest()
+{
+    // Verificar si speedtest-cli está instalado
+    QProcess check;
+    check.start("which", {"speedtest-cli"});
+    check.waitForFinished(2000);
+    if (check.exitCode() != 0) {
+        emit speedTestError("speedtest-cli no encontrado. Instálalo con:\n"
+                            "sudo apt install speedtest-cli");
+        return;
+    }
+
+    // Ejecutar speedtest-cli con salida JSON
+    QProcess *proc = new QProcess(this);
+    proc->start("speedtest-cli", {"--json"});
+
+    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, proc](int exitCode, QProcess::ExitStatus) {
+                proc->deleteLater();
+
+                if (exitCode != 0) {
+                    QString err = proc->readAllStandardError();
+                    emit speedTestError("Error al ejecutar speedtest-cli:\n" + err);
+                    return;
+                }
+
+                QByteArray output = proc->readAllStandardOutput();
+                QJsonParseError jsonError;
+                QJsonDocument doc = QJsonDocument::fromJson(output, &jsonError);
+
+                if (jsonError.error != QJsonParseError::NoError || !doc.isObject()) {
+                    emit speedTestError("Error al leer el resultado JSON.");
+                    return;
+                }
+
+                QJsonObject obj = doc.object();
+
+                // Extraer datos (los nombres exactos dependen de la versión)
+                // Para speedtest-cli oficial (Ookla) los campos son:
+                double downloadBps = obj["download"].toDouble();   // en bits/s
+                double uploadBps   = obj["upload"].toDouble();     // en bits/s
+                double pingMs      = obj["ping"].toDouble();       // en ms
+
+                // Convertir a Mbps (1 Mbps = 1,000,000 bps)
+                double downloadMbps = downloadBps / 1e6;
+                double uploadMbps   = uploadBps / 1e6;
+
+                emit speedTestFinished(downloadMbps, uploadMbps, pingMs);
+            });
 }
 
