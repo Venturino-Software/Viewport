@@ -1,0 +1,15 @@
+Package: viewport
+Version: 1.0.61
+Architecture: amd64
+Maintainer: VNT <zeus.ruffo@icloud.com>
+Depends: libqt6core6, libqt6gui6, libqt6qml6, libqt6quick6, libqt6core5compat6, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-shapes, qml6-module-qt5compat-graphicaleffects, libasound2
+Recommends: fonts-nunito
+Priority: optional
+Section: utils
+Filename: pool/main/v/viewport/viewport_1.0.61_amd64.deb
+Size: 1516612
+SHA256: 42224c7765be99083310cc33f76d1e3136c3de04c10442052d6c28d4f5ad62dd
+SHA1: 6d8d8be8ebb567bf0773e08770c39fa45906c995
+MD5sum: 1d941c0b95a7a68e7e304f5b50d9a4cc
+Description: Entorno grafico ultraligero y ultracustomizable.
+

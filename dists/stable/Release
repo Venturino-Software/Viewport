@@ -1,0 +1,20 @@
+Origin: Viewport Repository
+Label: Viewport Stable
+Suite: stable
+Codename: stable
+Date: Sun, 31 May 2026 19:01:14 UTC
+Architectures: amd64
+Components: main
+Description: Repositorio estable para Viewport
+MD5Sum:
+ d41d8cd98f00b204e9800998ecf8427e 0 main/binary-amd64/Packages
+ 7029066c27ac6f5ef18d660d5741979a 20 main/binary-amd64/Packages.gz
+ 34f9034727ed2be9be810703b59160d3 150 main/binary-amd64/Release
+SHA1:
+ da39a3ee5e6b4b0d3255bfef95601890afd80709 0 main/binary-amd64/Packages
+ 46c6643f07aa7f6bfe7118de926b86defc5087c4 20 main/binary-amd64/Packages.gz
+ 6d5f7602e3d89c8dd2e9786861a9c0801fa925fc 150 main/binary-amd64/Release
+SHA256:
+ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 0 main/binary-amd64/Packages
+ 59869db34853933b239f1e2219cf7d431da006aa919635478511fabbfc8849d2 20 main/binary-amd64/Packages.gz
+ 8076e8a52063b50c6ff3b2f60bc486f65bab9cbcfa351b9b25133ec317354cca 150 main/binary-amd64/Release

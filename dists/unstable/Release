@@ -1,0 +1,20 @@
+Origin: Viewport Repository
+Label: Viewport Unstable
+Suite: unstable
+Codename: unstable
+Date: Sun, 31 May 2026 19:01:14 UTC
+Architectures: amd64
+Components: main
+Description: Repositorio inestable para Viewport
+MD5Sum:
+ 0844a086eef9889b133791068dae0791 666 main/binary-amd64/Packages
+ cc408fc24f5a1a90749262442449dbe6 443 main/binary-amd64/Packages.gz
+ a98dce0f010d148f7c2e9dab6c8a147a 156 main/binary-amd64/Release
+SHA1:
+ 4478d1f0018dfdf4f7d69c021b7744def0d3c629 666 main/binary-amd64/Packages
+ 1188088e4207f9f094f4348f6be1a3a759ab2537 443 main/binary-amd64/Packages.gz
+ 25bc86eaad9d1715510cb2583f6a29b1f95e2f4c 156 main/binary-amd64/Release
+SHA256:
+ 599dc9096537f9f3722a626bb2cff4e817806e5459fe97645712e902ffb579cd 666 main/binary-amd64/Packages
+ 2922d7ef53e3a0003be20290d3597cbb16e6e9808ea99a43be255b6d8fe98725 443 main/binary-amd64/Packages.gz
+ 1e82a34c8c3e131dcd1e2ff885f80a812f6388d10d9b239a9843425d8598b393 156 main/binary-amd64/Release

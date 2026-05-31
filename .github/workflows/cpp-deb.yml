@@ -1,0 +1,143 @@
+name: Generar Paquete DEB y Publicar APT
+
+on:
+  push:
+    branches:
+      - "main"    # → unstable
+      - "stable"  # → stable
+
+permissions:
+  contents: write
+
+jobs:
+  deploy-apt-repo:
+    runs-on: ubuntu-22.04
+
+    env:
+      # Codename según la rama
+      CODENAME: ${{ github.ref_name == 'main' && 'unstable' || github.ref_name }}
+      DEB_SUFFIX: ${{ github.ref_name == 'main' && 'unstable' || 'stable' }}
+
+    steps:
+      - name: Descargar código fuente
+        uses: actions/checkout@v4
+
+      - name: Instalar dependencias del sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build \
+                                  libgl1-mesa-dev libxkbcommon-dev \
+                                  libvulkan-dev libdbus-1-dev reprepro libasound2-dev qml6-module-qtmultimedia
+
+      - name: Instalar Qt 6.4.2
+        id: qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.4.2'
+          aqtversion: '==3.1.5'
+          modules: 'qt5compat qtmultimedia'
+
+      - name: Compilar Viewport (appvpt01)
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${{ steps.qt.outputs.qt_prefix }}
+          cmake --build build
+
+      - name: Crear y empaquetar .deb
+        run: |
+          mkdir -p debian_package/vpt/bin
+          mkdir -p debian_package/DEBIAN
+
+          cp build/appvpt01 debian_package/vpt/bin/viewport
+          cp Main.qml debian_package/vpt/bin/
+          cp StyledPopup.qml debian_package/vpt/bin/
+          cp StyledButton.qml debian_package/vpt/bin/
+          cp FontManager.qml debian_package/vpt/bin/
+          cp nunito.ttf debian_package/vpt/bin/
+          cp nunitor.ttf debian_package/vpt/bin/
+          cp changaone.ttf debian_package/vpt/bin/
+          cp FirstStart.qml debian_package/vpt/bin/
+          cp CommandPill.qml debian_package/vpt/bin/
+          cp azaretmono.ttf debian_package/vpt/bin/
+          cp -r src debian_package/vpt/bin/
+          cp orbit.png debian_package/vpt/bin/
+
+          VERSION="1.0.${{ github.run_number }}"
+
+          cat <<EOF > debian_package/DEBIAN/control
+          Package: viewport
+          Version: $VERSION
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: VNT <zeus.ruffo@icloud.com>
+          Depends: libqt6core6, libqt6gui6, libqt6qml6, libqt6quick6, libqt6core5compat6, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-shapes, qml6-module-qt5compat-graphicaleffects, libasound2
+          Recommends: fonts-nunito
+          Description: Entorno grafico ultraligero y ultracustomizable.
+          EOF
+
+          dpkg-deb --build debian_package viewport_${DEB_SUFFIX}.deb
+          mv viewport_${DEB_SUFFIX}.deb /tmp/viewport.deb
+
+      - name: Configurar, firmar y publicar repositorio APT (convivencia)
+        run: |
+          git fetch origin
+          git checkout gh-pages || git checkout --orphan gh-pages
+
+          # No limpiamos el directorio: así mantenemos ambos codenames
+          mkdir -p conf
+
+          # Definimos ambos componentes en la configuración de reprepro
+          cat <<EOF > conf/distributions
+          Origin: Viewport Repository
+          Label: Viewport Unstable
+          Codename: unstable
+          Suite: unstable
+          Architectures: amd64
+          Components: main
+          Description: Repositorio inestable para Viewport
+
+          Origin: Viewport Repository
+          Label: Viewport Stable
+          Codename: stable
+          Suite: stable
+          Architectures: amd64
+          Components: main
+          Description: Repositorio estable para Viewport
+          EOF
+
+          # Añadimos el paquete al codename actual
+          reprepro -b . includedeb ${CODENAME} /tmp/viewport.deb
+
+          # Exportamos índices y limpiamos huérfanos
+          reprepro -b . export
+          reprepro -b . clearvanished
+          reprepro -b . createsymlinks
+
+          # Verificamos y corregimos el hash de Packages.gz si es necesario
+          cd dists/${CODENAME}
+          md5sum main/binary-amd64/Packages.gz > /tmp/check_md5
+          if ! grep -q "$(cat /tmp/check_md5)" Release; then
+            echo "⚠️ Regenerando Release manualmente para ${CODENAME}"
+            cd ../..
+            reprepro -b . export
+          else
+            cd ../..
+          fi
+
+          # Importamos la clave GPG y firmamos el Release del codename actual
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --pinentry-mode loopback \
+            --passphrase-fd 0 \
+            --detach-sign --armor \
+            --output dists/${CODENAME}/Release.gpg \
+              dists/${CODENAME}/Release
+
+          # Exportamos la clave pública y aseguramos el CNAME
+          gpg --armor --export > publickey.asc
+          echo "vpt.soyss.cc" > CNAME
+
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          git add --all
+          git commit -m "🔧 APT ${CODENAME}: v${{ github.run_number }} (firmado)"
+          git push origin gh-pages --force

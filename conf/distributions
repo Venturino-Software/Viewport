@@ -1,0 +1,15 @@
+Origin: Viewport Repository
+Label: Viewport Unstable
+Codename: unstable
+Suite: unstable
+Architectures: amd64
+Components: main
+Description: Repositorio inestable para Viewport
+
+Origin: Viewport Repository
+Label: Viewport Stable
+Codename: stable
+Suite: stable
+Architectures: amd64
+Components: main
+Description: Repositorio estable para Viewport
