@@ -1,4 +1,4 @@
-name: Generar Paquete DEB y Publicar APT
+name: Generar Paquetes y Publicar Repos (APT y Pacman)
 
 on:
   push:
@@ -10,11 +10,10 @@ permissions:
   contents: write
 
 jobs:
-  deploy-apt-repo:
+  deploy-repos:
     runs-on: ubuntu-22.04
 
     env:
-      # Codename según la rama
       CODENAME: ${{ github.ref_name == 'main' && 'unstable' || github.ref_name }}
       DEB_SUFFIX: ${{ github.ref_name == 'main' && 'unstable' || 'stable' }}
 
@@ -22,14 +21,14 @@ jobs:
       - name: Descargar código fuente
         uses: actions/checkout@v4
 
-      - name: Instalar dependencias del sistema
+      - name: Instalar dependencias del sistema (Ubuntu)
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build \
                                   libgl1-mesa-dev libxkbcommon-dev \
                                   libvulkan-dev libdbus-1-dev reprepro libasound2-dev qml6-module-qtmultimedia
 
-      - name: Instalar Qt 6.4.2
+      - name: Instalar Qt 6.4.2 (Ubuntu)
         id: qt
         uses: jurplel/install-qt-action@v4
         with:
@@ -37,7 +36,7 @@ jobs:
           aqtversion: '==3.1.5'
           modules: 'qt5compat qtmultimedia'
 
-      - name: Compilar Viewport (appvpt01)
+      - name: Compilar Viewport para Debian
         run: |
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${{ steps.qt.outputs.qt_prefix }}
           cmake --build build
@@ -78,15 +77,61 @@ jobs:
           dpkg-deb --build debian_package viewport_${DEB_SUFFIX}.deb
           mv viewport_${DEB_SUFFIX}.deb /tmp/viewport.deb
 
-      - name: Configurar, firmar y publicar repositorio APT (convivencia)
+      - name: Compilar y empaquetar para Arch Linux (Docker)
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/work archlinux:base-devel /bin/bash -c "
+            pacman -Syu --noconfirm &&
+            pacman -S --noconfirm cmake ninja qt6-base qt6-declarative qt6-multimedia qt6-5compat sudo &&
+            useradd -m builduser &&
+            cp -r /work /home/builduser/src_code &&
+            chown -R builduser:builduser /home/builduser/src_code &&
+            cd /home/builduser/src_code &&
+            sudo -u builduser bash -c '
+              cat <<EOF > PKGBUILD
+          pkgname=viewport
+          pkgver=1.0.${{ github.run_number }}
+          pkgrel=1
+          pkgdesc=\"Entorno grafico ultraligero y ultracustomizable.\"
+          arch=(\"x86_64\")
+          depends=(\"qt6-base\" \"qt6-declarative\" \"qt6-multimedia\" \"qt6-5compat\" \"alsa-lib\")
+          makedepends=(\"cmake\" \"ninja\")
+          build() {
+            cmake -B build_arch -G Ninja -DCMAKE_BUILD_TYPE=Release
+            cmake --build build_arch
+          }
+          package() {
+            mkdir -p \\\$pkgdir/opt/viewport/bin
+            cp build_arch/appvpt01 \\\$pkgdir/opt/viewport/bin/viewport
+            cp Main.qml \\\$pkgdir/opt/viewport/bin/
+            cp StyledPopup.qml \\\$pkgdir/opt/viewport/bin/
+            cp StyledButton.qml \\\$pkgdir/opt/viewport/bin/
+            cp FontManager.qml \\\$pkgdir/opt/viewport/bin/
+            cp nunito.ttf \\\$pkgdir/opt/viewport/bin/
+            cp nunitor.ttf \\\$pkgdir/opt/viewport/bin/
+            cp changaone.ttf \\\$pkgdir/opt/viewport/bin/
+            cp FirstStart.qml \\\$pkgdir/opt/viewport/bin/
+            cp CommandPill.qml \\\$pkgdir/opt/viewport/bin/
+            cp azaretmono.ttf \\\$pkgdir/opt/viewport/bin/
+            cp -r src \\\$pkgdir/opt/viewport/bin/
+            cp orbit.png \\\$pkgdir/opt/viewport/bin/
+
+            mkdir -p \\\$pkgdir/usr/bin
+            ln -s /opt/viewport/bin/viewport \\\$pkgdir/usr/bin/viewport
+          }
+          EOF
+              makepkg -s --noconfirm
+            ' &&
+            cp /home/builduser/src_code/viewport-*.pkg.tar.zst /work/
+          "
+          mv viewport-*.pkg.tar.zst /tmp/
+
+      - name: Configurar, firmar y publicar repositorios (APT y Pacman)
         run: |
           git fetch origin
           git checkout gh-pages || git checkout --orphan gh-pages
 
-          # No limpiamos el directorio: así mantenemos ambos codenames
+          # --- DEBIAN APT REPO ---
           mkdir -p conf
-
-          # Definimos ambos componentes en la configuración de reprepro
           cat <<EOF > conf/distributions
           Origin: Viewport Repository
           Label: Viewport Unstable
@@ -105,15 +150,11 @@ jobs:
           Description: Repositorio estable para Viewport
           EOF
 
-          # Añadimos el paquete al codename actual
           reprepro -b . includedeb ${CODENAME} /tmp/viewport.deb
-
-          # Exportamos índices y limpiamos huérfanos
           reprepro -b . export
           reprepro -b . clearvanished
           reprepro -b . createsymlinks
 
-          # Verificamos y corregimos el hash de Packages.gz si es necesario
           cd dists/${CODENAME}
           md5sum main/binary-amd64/Packages.gz > /tmp/check_md5
           if ! grep -q "$(cat /tmp/check_md5)" Release; then
@@ -124,7 +165,6 @@ jobs:
             cd ../..
           fi
 
-          # Importamos la clave GPG y firmamos el Release del codename actual
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
           echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --pinentry-mode loopback \
             --passphrase-fd 0 \
@@ -132,12 +172,21 @@ jobs:
             --output dists/${CODENAME}/Release.gpg \
               dists/${CODENAME}/Release
 
-          # Exportamos la clave pública y aseguramos el CNAME
           gpg --armor --export > publickey.asc
           echo "vpt.soyss.cc" > CNAME
 
+          # --- ARCH LINUX REPO ---
+          # Utilizamos un contenedor de Arch para poder ejecutar repo-add sobre la rama gh-pages
+          docker run --rm -v ${{ github.workspace }}:/work -v /tmp:/tmp archlinux:base-devel /bin/bash -c "
+            cd /work &&
+            mkdir -p arch/${CODENAME}/os/x86_64 &&
+            cp /tmp/viewport*.pkg.tar.zst arch/${CODENAME}/os/x86_64/ &&
+            repo-add arch/${CODENAME}/os/x86_64/viewport.db.tar.gz arch/${CODENAME}/os/x86_64/viewport*.pkg.tar.zst
+          "
+
+          # --- COMMIT Y PUSH FINAL ---
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action Bot"
           git add --all
-          git commit -m "🔧 APT ${CODENAME}: v${{ github.run_number }} (firmado)"
+          git commit -m "🔧 Repos ${CODENAME}: v${{ github.run_number }} (APT firmado + Arch pacman)"
           git push origin gh-pages --force
